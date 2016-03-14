@@ -7,7 +7,7 @@ class PnPSolver
 public:
 	PnPSolver();
 	PnPSolver(cv::Mat CM);
-	
+
 	void setWorldPoints();
 	void setWorldPoints(std::vector<cv::Point3f> WP);
 

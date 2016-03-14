@@ -1,4 +1,5 @@
 #include "PnPSolver.h"
+#include "Converter.h"
 
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -16,6 +17,7 @@ using namespace std;
 /*
 	solvePnP defined here: http://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
 
+	solvePnP outputs the translation in the same units as we specify world points.
 */
 
 int PnPSolver::foo()
@@ -24,8 +26,6 @@ int PnPSolver::foo()
 	int64 now, then;
 	double elapsedSeconds, ticksPerSecond = cvGetTickFrequency()*1.0e6;
 
-	then = cvGetTickCount();
-
 	//Real object points set
 	//vector<Point3f> object;
 	//object.push_back(Point3d(-88.0f, 88.0f, 0));
@@ -33,50 +33,66 @@ int PnPSolver::foo()
 	//object.push_back(Point3d(88.0f, -88.0f, 0));
 	//object.push_back(Point3d(88.0f, 88.0f, 0));
 	
-	now = cvGetTickCount();
-	elapsedSeconds = (double)(now - then) / ticksPerSecond;
-
-	cout << "Initializtion took " << elapsedSeconds << " seconds" << endl;
-
 	//PnP
 	Mat rVecIter, tVecIter;
 	Mat rVecP3P, tVecP3P;
 
-	// Keep track of time
-	then = cvGetTickCount();
-
-	solvePnP(Mat(worldPoints), Mat(imagePoints), cameraMatrix, Mat(), rVecIter, tVecIter, false, CV_ITERATIVE);
 	
-	// Calculate time>
-	now = cvGetTickCount();
-	elapsedSeconds = (double)(now - then) / ticksPerSecond;
-	cout << "PnP (ITERATIVE) took " << elapsedSeconds << " seconds" << endl;
-	then = cvGetTickCount();
 
-	// P3P requires exactly 4 points in both object and scene
-	solvePnP(Mat(worldPoints), Mat(imagePoints), cameraMatrix, Mat(), rVecP3P, tVecP3P, false, CV_P3P);
+	if(imagePoints.size() != 4 | worldPoints.size() != 4)
+	{ 
+		// Keep track of time
+		then = cvGetTickCount();
+
+		solvePnP(Mat(worldPoints), Mat(imagePoints), cameraMatrix, Mat(), rVecIter, tVecIter, false, CV_ITERATIVE);
 	
-	// Calculate time
-	now = cvGetTickCount();
-	elapsedSeconds = (double)(now - then) / ticksPerSecond;
-	cout << "PnP (P3P) took " << elapsedSeconds << " seconds" << endl;
+		Mat rMatIter(3, 3, DataType<double>::type);
+		Rodrigues(rVecIter, rMatIter);
 
+		Mat tMatIter(3, 3, DataType<double>::type);
+		Rodrigues(tVecIter, tMatIter);
+	
+		// Calculate time>
+		now = cvGetTickCount();
+		elapsedSeconds = (double)(now - then) / ticksPerSecond;
+		cout << "PnP (ITERATIVE) took " << elapsedSeconds << " seconds" << endl;
 
-	//Print result
-	cout << "Iterative: " << endl;
-	cout << " rvec1 " << endl << " " << rVecIter << endl << endl;
-	cout << " tvec1 " << endl << " " << tVecIter << endl << endl;
+		//Print result
+		cout << "Iterative: " << endl;
+		cout << "\t R-MAT " << endl << " " << rMatIter << endl << endl;
+		cout << "\t T-MAT " << endl << " " << tMatIter << endl << endl;
+		
+	}
+	else
+	{
+		then = cvGetTickCount();
 
-	cout << "P3P: " << endl;
-	cout << " rvec1 " << endl << " " << rVecP3P << endl << endl;
-	cout << " tvec1 " << endl << " " << tVecP3P << endl << endl;
+		// P3P requires exactly 4 points in both object and scene
+		solvePnP(Mat(worldPoints), Mat(imagePoints), cameraMatrix, Mat(), rVecP3P, tVecP3P, false, CV_P3P);
+
+		Mat rMatP3P(3, 3, DataType<double>::type);
+		Rodrigues(rVecP3P, rMatP3P);
+
+		Mat tMatP3P(3, 3, DataType<double>::type);
+		Rodrigues(tVecP3P, tMatP3P);
+
+		// Calculate time
+		now = cvGetTickCount();
+		elapsedSeconds = (double)(now - then) / ticksPerSecond;
+		cout << "PnP (P3P) took " << elapsedSeconds << " seconds" << endl;
+		
+		cout << "P3P: " << endl;
+		cout << "\t R-MAT " << endl << " " << rMatP3P << endl << endl;
+		cout << "\t T-MAT " << endl << " " << tMatP3P << endl << endl;
+	}
+	
 
 	return 0;
 }
 
 PnPSolver::PnPSolver()
 {																//							    Camera matrix
-	cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));	    //								___		  ___
+	cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));			//								___		  ___
 	cameraMatrix.at<double>(0, 0) = 1432;						// Focal length X				| fx  0  cx |
 	cameraMatrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
 	cameraMatrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   0 |
@@ -102,11 +118,28 @@ PnPSolver::PnPSolver(Mat CM)
 // Use default image points, not recommended
 void PnPSolver::setImagePoints()
 {
+	float	W = 4.8,
+			w = 1280.0,
+			H = 3.6,
+			h = 960,
+			f = 1432,
+			F = Converter::ImageToWorldF(f, W, w);
 	
-	PnPSolver::imagePoints.push_back(Point2d(384.3331f, 162.23618f));
-	PnPSolver::imagePoints.push_back(Point2d(385.27521f, 135.21503f));
-	PnPSolver::imagePoints.push_back(Point2d(409.36746f, 139.30315f));
-	PnPSolver::imagePoints.push_back(Point2d(407.43854f, 165.64435f));
+
+	PnPSolver::imagePoints.push_back(Point2d(3.97210571e+02, 1.45146866e+02));
+	PnPSolver::imagePoints.push_back(Point2d(6.50494934e+02, 1.29172379e+02));
+	PnPSolver::imagePoints.push_back(Point2d(5.19567688e+02, 1.31898239e+02));
+	PnPSolver::imagePoints.push_back(Point2d(5.31834473e+02, 2.67480103e+02));
+	PnPSolver::imagePoints.push_back(Point2d(2.39835358e+02, 2.07141220e+02));
+	PnPSolver::imagePoints.push_back(Point2d(8.34740051e+02, 1.74580566e+02));
+	PnPSolver::imagePoints.push_back(Point2d(2.11190155e+02, 5.10402740e+02));
+
+
+	//Converted from pixels to meters
+	//PnPSolver::imagePoints.push_back(Point2d(Converter::ImageToWorldX(384.3331f, W, w), Converter::ImageToWorldY(162.23618f, H, h)));
+	//PnPSolver::imagePoints.push_back(Point2d(Converter::ImageToWorldX(385.27521f, W, w), Converter::ImageToWorldY(135.21503f, H, h)));
+	//PnPSolver::imagePoints.push_back(Point2d(Converter::ImageToWorldX(409.36746f, W, w), Converter::ImageToWorldY(139.30315f, H, h)));
+	//PnPSolver::imagePoints.push_back(Point2d(Converter::ImageToWorldX(407.43854f, W, w), Converter::ImageToWorldY(165.64435f, H, h)));
 }
 
 void PnPSolver::setImagePoints(vector<Point2f> IP)
@@ -114,14 +147,27 @@ void PnPSolver::setImagePoints(vector<Point2f> IP)
 	PnPSolver::imagePoints = IP;
 }
 
-// Use default image points, not recommended
+// Use default world points, not recommended
 void PnPSolver::setWorldPoints()
 {
 	// 3D scene
-	PnPSolver::worldPoints.push_back(Point3d(143432.108, 6394362.287, 39.617));
 	PnPSolver::worldPoints.push_back(Point3d(143430.318, 6394363.127, 39.797));
-	PnPSolver::worldPoints.push_back(Point3d(143427.048, 6394361.520, 33.577));
+	PnPSolver::worldPoints.push_back(Point3d(143434.166, 6394361.662, 39.842));
+	PnPSolver::worldPoints.push_back(Point3d(143432.108, 6394362.287, 39.617));
 	PnPSolver::worldPoints.push_back(Point3d(143432.948, 6394364.927, 37.656));
+	PnPSolver::worldPoints.push_back(Point3d(143427.658, 6394362.027, 38.376));
+	PnPSolver::worldPoints.push_back(Point3d(143436.316, 6394359.472, 38.452));
+	PnPSolver::worldPoints.push_back(Point3d(143462.114, 6394450.099, 38.451));
+	/*
+	PnPSolver::worldPoints.push_back(Point3d(143469.613, 6394456.418, 38.800));
+	PnPSolver::worldPoints.push_back(Point3d(143468.953, 6394441.302, 37.281));
+	PnPSolver::worldPoints.push_back(Point3d(143466.173, 6394449.469, 38.671));
+	PnPSolver::worldPoints.push_back(Point3d(143467.283, 6394451.589, 38.711));
+	PnPSolver::worldPoints.push_back(Point3d(143468.983, 6394441.362, 36.431));
+	PnPSolver::worldPoints.push_back(Point3d(143427.048, 6394361.520, 33.577));
+	*/
+
+
 	/*
 	PnPSolver::worldPoints.push_back(Point3d(143436.316, 6394359.472, 38.452));
 	PnPSolver::worldPoints.push_back(Point3d(143427.658, 6394362.027, 38.376));
