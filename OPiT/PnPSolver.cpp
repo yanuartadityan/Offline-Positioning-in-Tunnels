@@ -16,7 +16,6 @@ using namespace std;
 /*
 	solvePnP defined here: http://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
 
-
 */
 
 int PnPSolver::foo()
@@ -27,46 +26,13 @@ int PnPSolver::foo()
 
 	then = cvGetTickCount();
 
-
-
-	//2D image
-	vector<Point2f> points1;
-	points1.push_back(Point2d(384.3331f, 162.23618f));
-	points1.push_back(Point2d(385.27521f, 135.21503f));
-	points1.push_back(Point2d(409.36746f, 139.30315f));
-	points1.push_back(Point2d(407.43854f, 165.64435f));
-
 	//Real object points set
 	//vector<Point3f> object;
 	//object.push_back(Point3d(-88.0f, 88.0f, 0));
 	//object.push_back(Point3d(-88.0f, -88.0f, 0));
 	//object.push_back(Point3d(88.0f, -88.0f, 0));
 	//object.push_back(Point3d(88.0f, 88.0f, 0));
-
-	// 3D scene
-	vector<Point3f> object;
-	object.push_back(Point3d(143432.108, 6394362.287, 39.617));
-	object.push_back(Point3d(143430.318, 6394363.127, 39.797));
-	object.push_back(Point3d(143427.048, 6394361.520, 33.577));
-	object.push_back(Point3d(143432.948, 6394364.927, 37.656));
-	/*
-	object.push_back(Point3d(143436.316, 6394359.472, 38.452));
-	object.push_back(Point3d(143427.658, 6394362.027, 38.376));
-	object.push_back(Point3d(143468.983, 6394441.362, 36.431));
-	object.push_back(Point3d(143468.953, 6394441.302, 37.281));
-	object.push_back(Point3d(143462.114, 6394450.099, 38.451));
-	object.push_back(Point3d(143467.283, 6394451.589, 38.711));
-	object.push_back(Point3d(143466.173, 6394449.469, 38.671));
-	object.push_back(Point3d(143469.613, 6394456.418, 38.800));
-	*/
-															//								Camera matrix
-	Mat cam_matrix = Mat(3, 3, CV_64FC1, Scalar::all(0));	//								___		  ___
-	cam_matrix.at<double>(0, 0) = 1432;						// Focal length X				| fx  0  cx |
-	cam_matrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
-	cam_matrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   0 |
-	cam_matrix.at<double>(1, 2) = 481;						// Principal point Y			---		  ---
-	cam_matrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not
-
+	
 	now = cvGetTickCount();
 	elapsedSeconds = (double)(now - then) / ticksPerSecond;
 
@@ -79,7 +45,7 @@ int PnPSolver::foo()
 	// Keep track of time
 	then = cvGetTickCount();
 
-	solvePnP(Mat(object), Mat(points1), cam_matrix, Mat(), rVecIter, tVecIter, false, CV_ITERATIVE);
+	solvePnP(Mat(worldPoints), Mat(imagePoints), cameraMatrix, Mat(), rVecIter, tVecIter, false, CV_ITERATIVE);
 	
 	// Calculate time>
 	now = cvGetTickCount();
@@ -88,7 +54,7 @@ int PnPSolver::foo()
 	then = cvGetTickCount();
 
 	// P3P requires exactly 4 points in both object and scene
-	solvePnP(Mat(object), Mat(points1), cam_matrix, Mat(), rVecP3P, tVecP3P, false, CV_P3P);
+	solvePnP(Mat(worldPoints), Mat(imagePoints), cameraMatrix, Mat(), rVecP3P, tVecP3P, false, CV_P3P);
 	
 	// Calculate time
 	now = cvGetTickCount();
@@ -109,6 +75,66 @@ int PnPSolver::foo()
 }
 
 PnPSolver::PnPSolver()
+{																//							    Camera matrix
+	cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));	    //								___		  ___
+	cameraMatrix.at<double>(0, 0) = 1432;						// Focal length X				| fx  0  cx |
+	cameraMatrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
+	cameraMatrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   0 |
+	cameraMatrix.at<double>(1, 2) = 481;						// Principal point Y			---		  ---
+	cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not
+	
+
+	
+}
+
+PnPSolver::PnPSolver(Mat CM)
 {
-	foo();
+	if (cameraMatrix.rows != 3)
+		cerr << "WRONG NR OF ROWS, MUST BE 3" << endl;
+	else if (cameraMatrix.cols != 3)
+		cerr << "WRONG NR OF COLUMNS, MUST BE 3" << endl;
+
+	cameraMatrix.copyTo(PnPSolver::cameraMatrix);
+
+	
+}
+
+// Use default image points, not recommended
+void PnPSolver::setImagePoints()
+{
+	
+	PnPSolver::imagePoints.push_back(Point2d(384.3331f, 162.23618f));
+	PnPSolver::imagePoints.push_back(Point2d(385.27521f, 135.21503f));
+	PnPSolver::imagePoints.push_back(Point2d(409.36746f, 139.30315f));
+	PnPSolver::imagePoints.push_back(Point2d(407.43854f, 165.64435f));
+}
+
+void PnPSolver::setImagePoints(vector<Point2f> IP)
+{
+	PnPSolver::imagePoints = IP;
+}
+
+// Use default image points, not recommended
+void PnPSolver::setWorldPoints()
+{
+	// 3D scene
+	PnPSolver::worldPoints.push_back(Point3d(143432.108, 6394362.287, 39.617));
+	PnPSolver::worldPoints.push_back(Point3d(143430.318, 6394363.127, 39.797));
+	PnPSolver::worldPoints.push_back(Point3d(143427.048, 6394361.520, 33.577));
+	PnPSolver::worldPoints.push_back(Point3d(143432.948, 6394364.927, 37.656));
+	/*
+	PnPSolver::worldPoints.push_back(Point3d(143436.316, 6394359.472, 38.452));
+	PnPSolver::worldPoints.push_back(Point3d(143427.658, 6394362.027, 38.376));
+	PnPSolver::worldPoints.push_back(Point3d(143468.983, 6394441.362, 36.431));
+	PnPSolver::worldPoints.push_back(Point3d(143468.953, 6394441.302, 37.281));
+	PnPSolver::worldPoints.push_back(Point3d(143462.114, 6394450.099, 38.451));
+	PnPSolver::worldPoints.push_back(Point3d(143467.283, 6394451.589, 38.711));
+	PnPSolver::worldPoints.push_back(Point3d(143466.173, 6394449.469, 38.671));
+	PnPSolver::worldPoints.push_back(Point3d(143469.613, 6394456.418, 38.800));
+	*/
+}
+
+void PnPSolver::setWorldPoints(vector<Point3f> WP)
+{
+	PnPSolver::worldPoints = WP;
 }
