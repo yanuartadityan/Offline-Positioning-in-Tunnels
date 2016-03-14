@@ -13,6 +13,12 @@
 using namespace cv;
 using namespace std;
 
+/*
+	solvePnP defined here: http://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
+
+
+*/
+
 int PnPSolver::foo()
 {
 	//MEASURE THE TIME
@@ -53,12 +59,12 @@ int PnPSolver::foo()
 	object.push_back(Point3d(143466.173, 6394449.469, 38.671));
 	object.push_back(Point3d(143469.613, 6394456.418, 38.800));
 	*/
-	//Camera matrix
-	Mat cam_matrix = Mat(3, 3, CV_64FC1, Scalar::all(0));
-	cam_matrix.at<double>(0, 0) = 1432;						// Focal length X
-	cam_matrix.at<double>(1, 1) = 1432;						// Focal length Y
-	cam_matrix.at<double>(0, 2) = 640;						// Principal point X
-	cam_matrix.at<double>(1, 2) = 481;						// Principal point Y
+															//								Camera matrix
+	Mat cam_matrix = Mat(3, 3, CV_64FC1, Scalar::all(0));	//								___		  ___
+	cam_matrix.at<double>(0, 0) = 1432;						// Focal length X				| fx  0  cx |
+	cam_matrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
+	cam_matrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   0 |
+	cam_matrix.at<double>(1, 2) = 481;						// Principal point Y			---		  ---
 	cam_matrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not
 
 	now = cvGetTickCount();
@@ -67,43 +73,37 @@ int PnPSolver::foo()
 	cout << "Initializtion took " << elapsedSeconds << " seconds" << endl;
 
 	//PnP
-	Mat rvec1i, rvec2i, tvec1i, tvec2i;
-	Mat rvec1p, rvec2p, tvec1p, tvec2p;
+	Mat rVecIter, tVecIter;
+	Mat rVecP3P, tVecP3P;
 
-
+	// Keep track of time
 	then = cvGetTickCount();
 
-	solvePnP(Mat(object), Mat(points1), cam_matrix, Mat(), rvec1i, tvec1i, false, CV_ITERATIVE);
-	//solvePnP(Mat(object), Mat(points2), cam_matrix, Mat(), rvec2i, tvec2i, false, CV_ITERATIVE);
-
+	solvePnP(Mat(object), Mat(points1), cam_matrix, Mat(), rVecIter, tVecIter, false, CV_ITERATIVE);
+	
+	// Calculate time>
 	now = cvGetTickCount();
 	elapsedSeconds = (double)(now - then) / ticksPerSecond;
-
 	cout << "PnP (ITERATIVE) took " << elapsedSeconds << " seconds" << endl;
-
 	then = cvGetTickCount();
 
-	solvePnP(Mat(object), Mat(points1), cam_matrix, Mat(), rvec1p, tvec1p, false, CV_P3P);
-	//solvePnP(Mat(object), Mat(points2), cam_matrix, Mat(), rvec2p, tvec2p, false, CV_P3P);
-
+	// P3P requires exactly 4 points in both object and scene
+	solvePnP(Mat(object), Mat(points1), cam_matrix, Mat(), rVecP3P, tVecP3P, false, CV_P3P);
+	
+	// Calculate time
 	now = cvGetTickCount();
 	elapsedSeconds = (double)(now - then) / ticksPerSecond;
-
 	cout << "PnP (P3P) took " << elapsedSeconds << " seconds" << endl;
 
 
 	//Print result
 	cout << "Iterative: " << endl;
-	cout << " rvec1 " << endl << " " << rvec1i << endl << endl;
-	cout << " rvec2 " << endl << " " << rvec2i << endl << endl;
-	cout << " tvec1 " << endl << " " << tvec1i << endl << endl;
-	cout << " tvec1 " << endl << " " << tvec2i << endl << endl;
+	cout << " rvec1 " << endl << " " << rVecIter << endl << endl;
+	cout << " tvec1 " << endl << " " << tVecIter << endl << endl;
 
 	cout << "P3P: " << endl;
-	cout << " rvec1 " << endl << " " << rvec1p << endl << endl;
-	cout << " rvec2 " << endl << " " << rvec2p << endl << endl;
-	cout << " tvec1 " << endl << " " << tvec1p << endl << endl;
-	cout << " tvec1 " << endl << " " << tvec2p << endl << endl;
+	cout << " rvec1 " << endl << " " << rVecP3P << endl << endl;
+	cout << " tvec1 " << endl << " " << tVecP3P << endl << endl;
 
 	return 0;
 }
