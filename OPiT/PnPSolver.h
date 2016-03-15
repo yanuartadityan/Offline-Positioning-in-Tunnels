@@ -24,15 +24,25 @@ public:
 	cv::Mat getRotationMatrix();
 	cv::Mat getTranslationMatrix();
 
+	cv::Mat getCameraPose();
+
+	std::vector<cv::Point2f> getProjectedImagePoints();
+	cv::Mat getProjectionJacobian();
+
 	int foo();
 
 private:
 	cv::Mat cameraMatrix;
+	
 	std::vector<cv::Point2f> imagePoints;
 	std::vector<cv::Point3f> worldPoints;
+	
 	cv::Mat rVecIter, tVecIter;
 	cv::Mat rMatIter, tMatIter;
+	cv::Mat cameraPose;
 	
+	std::vector<cv::Point2f> projectedImagePoints;
+	cv::Mat projectionJacobian;
 };
 
 #endif
