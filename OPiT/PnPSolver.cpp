@@ -20,8 +20,10 @@ using namespace std;
 	solvePnP outputs the translation in the same units as we specify world points.
 */
 
+
 int PnPSolver::foo()
 {
+	
 	//MEASURE THE TIME
 	int64 now, then;
 	double elapsedSeconds, ticksPerSecond = cvGetTickFrequency()*1.0e6;
@@ -34,7 +36,6 @@ int PnPSolver::foo()
 	//object.push_back(Point3d(88.0f, 88.0f, 0));
 	
 	//PnP
-	Mat rVecIter, tVecIter;
 	Mat rVecP3P, tVecP3P;
 
 	
@@ -43,14 +44,46 @@ int PnPSolver::foo()
 	{ 
 		// Keep track of time
 		then = cvGetTickCount();
+		
+		//solvePnP(Mat(worldPoints), Mat(imagePoints), cameraMatrix, Mat(), rVecIter, tVecIter, false, CV_ITERATIVE);
+		
+		
+		Mat inliers;
+		solvePnPRansac(
+			Mat(worldPoints),	// Array of world points in the world coordinate space, 3xN/Nx3 1-channel or 1xN/Nx1 3-channel, where N is the number of points.
+			Mat(imagePoints),	// Array of corresponding image points, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel, where N is the number of points.
+			cameraMatrix,		// Self-explanatory...
+			Mat(),				// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients 
+			rVecIter,			// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
+			tVecIter,			// Output translation vector
+			false,				// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
+								//						of the rotation and translation vectors, respectively, and further optimizes them.
+			100,				// ITERATIONS COUNT, number of iterations
+			8,					// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
+			0.95,				// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
+			//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
+			inliers,			// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
+			CV_ITERATIVE);		// FLAGS, method for solving a PnP problem.
 
-		solvePnP(Mat(worldPoints), Mat(imagePoints), cameraMatrix, Mat(), rVecIter, tVecIter, false, CV_ITERATIVE);
-	
-		Mat rMatIter(3, 3, DataType<double>::type);
+		cout << "Number of inliers: " << inliers.size() << endl;
+		
+		//Create the rotation matrix from the vector created above, by using the "Rodrigues"
+		rMatIter.create(3, 3, DataType<double>::type);
 		Rodrigues(rVecIter, rMatIter);
-
-		Mat tMatIter(3, 3, DataType<double>::type);
+		//Create the translation matrix from the vector created above, by using the "Rodrigues"
+		tMatIter.create(3, 3, DataType<double>::type);
 		Rodrigues(tVecIter, tMatIter);
+
+		transpose(rMatIter, rMatIter);
+		invert(rMatIter, rMatIter);
+		
+		Mat camPos;
+		cv::multiply(rMatIter, tMatIter, camPos);
+		
+
+		cout << "*******" << endl << "Camera position: " << endl << camPos << endl << "*******" << endl;
+
+		
 	
 		// Calculate time>
 		now = cvGetTickCount();
@@ -73,8 +106,8 @@ int PnPSolver::foo()
 		Mat rMatP3P(3, 3, DataType<double>::type);
 		Rodrigues(rVecP3P, rMatP3P);
 
-		Mat tMatP3P(3, 3, DataType<double>::type);
-		Rodrigues(tVecP3P, tMatP3P);
+		//Mat tMatP3P(3, 3, DataType<double>::type);
+		//Rodrigues(tVecP3P, tMatP3P);
 
 		// Calculate time
 		now = cvGetTickCount();
@@ -83,7 +116,7 @@ int PnPSolver::foo()
 		
 		cout << "P3P: " << endl;
 		cout << "\t R-MAT " << endl << " " << rMatP3P << endl << endl;
-		cout << "\t T-MAT " << endl << " " << tMatP3P << endl << endl;
+		cout << "\t T-MAT " << endl << " " << tVecP3P << endl << endl;
 	}
 	
 
@@ -97,10 +130,7 @@ PnPSolver::PnPSolver()
 	cameraMatrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
 	cameraMatrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   0 |
 	cameraMatrix.at<double>(1, 2) = 481;						// Principal point Y			---		  ---
-	cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not
-	
-
-	
+	cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not	
 }
 
 PnPSolver::PnPSolver(Mat CM)
@@ -147,6 +177,11 @@ void PnPSolver::setImagePoints(vector<Point2f> IP)
 	PnPSolver::imagePoints = IP;
 }
 
+vector<cv::Point2f> PnPSolver::getImagePoints()
+{
+	return PnPSolver::imagePoints;
+}
+
 // Use default world points, not recommended
 void PnPSolver::setWorldPoints()
 {
@@ -183,4 +218,31 @@ void PnPSolver::setWorldPoints()
 void PnPSolver::setWorldPoints(vector<Point3f> WP)
 {
 	PnPSolver::worldPoints = WP;
+}
+
+vector<cv::Point3f> PnPSolver::getWorldPoints()
+{
+	return PnPSolver::worldPoints;
+}
+
+
+Mat PnPSolver::getRotationVector()
+{
+	return PnPSolver::rVecIter;
+}
+Mat PnPSolver::getRotationMatrix()
+{
+	return PnPSolver::rMatIter;
+}
+Mat PnPSolver::getTranslationVector()
+{
+	return PnPSolver::tVecIter;
+}
+Mat PnPSolver::getTranslationMatrix()
+{
+	return PnPSolver::tMatIter;
+}
+Mat PnPSolver::getCameraMatrix()
+{
+	return PnPSolver::cameraMatrix;
 }
