@@ -12,6 +12,9 @@ public:
 	static float WorldToImageX(float, float, float);
 	static float WorldToImageY(float, float, float);
 	static float WorldToImageF(float, float, float);
+
+	static cv::Mat normalize2d(cv::Mat);
+	static cv::Mat normalize3d(cv::Mat);
 private:
 	
 };

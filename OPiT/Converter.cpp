@@ -49,3 +49,29 @@ float Converter::WorldToImageY(float Y, float H, float h)
 	return Y / (H / h);
 }
 
+/*
+	Normalisation of 2D coords
+	Requires input: Mat(3, 1, DataType<double>::type);
+*/
+Mat Converter::normalize2d(Mat coords)
+{
+	coords.at<double>(0, 0) = coords.at<double>(0, 0) / coords.at<double>(2, 0);
+	coords.at<double>(1, 0) = coords.at<double>(1, 0) / coords.at<double>(2, 0);
+	coords.at<double>(2, 0) = 1;
+
+	return coords;
+}
+
+/*
+Normalisation of 3D coords
+Requires input: Mat(4, 1, DataType<double>::type);
+*/
+Mat Converter::normalize3d(Mat coords)
+{
+	coords.at<double>(0, 0) = coords.at<double>(0, 0) / coords.at<double>(3, 0);
+	coords.at<double>(1, 0) = coords.at<double>(1, 0) / coords.at<double>(3, 0);
+	coords.at<double>(2, 0) = coords.at<double>(2, 0) / coords.at<double>(3, 0);
+	coords.at<double>(3, 0) = 1;
+
+	return coords;
+}
