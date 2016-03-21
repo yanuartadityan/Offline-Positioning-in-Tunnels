@@ -1,7 +1,6 @@
 #include "PnPSolver.h"
 #include "Converter.h"
 
-#include "Mesh.h"
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -41,16 +40,16 @@ int PnPSolver::foo(int verbalOutput)
 
 	then = cvGetTickCount();
 
-	
 	// Before anything, we try to calibrate the camera
 	vector< vector<Point3f> > VoVWorldPoints{ worldPoints, worldPoints };
 	distCoeffs = Mat::zeros(8, 1, CV_64F);
+	Mat cm; cameraMatrix.copyTo(cm);
 	Mat rvec, tvec;
 	calibrateCamera(	
 						VoVWorldPoints,					// A vector of vectors with the world points
 						VoVImagePoints,					// A vector of vectors with the image points
 						Size(1280,960),					// The image size
-						cameraMatrix,					// obvious...
+						cm,								// Output camera matrix, but we have already defined ours
 						distCoeffs,						// The distortion coeffiecients for the camera
 						rvec, tvec,						//
 						CV_CALIB_USE_INTRINSIC_GUESS);	// Optional flags	
@@ -59,15 +58,11 @@ int PnPSolver::foo(int verbalOutput)
 	now = cvGetTickCount();
 	elapsedSecondsCALIB = (double)(now - then) / ticksPerSecond;
 
-	cout << "Distcoeffs = " << endl << distCoeffs << endl << "**********" << endl;
-
-
-
+	
 	// Keep track of time
 	then = cvGetTickCount();
-		
+
 	Mat inliers;
-	cout << "Size of worldPoints = " << worldPoints.size() << endl << "Size of imagePoints = " << PnPSolver::imagePoints.size() << endl << endl;
 	/*
 		solvePnPRansac(): Finds an object pose from 3D-2D point correspondences using the RANSAC scheme.
 
@@ -79,13 +74,16 @@ int PnPSolver::foo(int verbalOutput)
 
 		Basically it estimates how the "world" is rotated relative to camera.
 	*/
+	/*
+		Use zero distortion, or the distcoeff calculated by calibrateCamera()?
+	*/
 	solvePnPRansac(
 		Mat(worldPoints),	// Array of world points in the world coordinate space, 3xN/Nx3 1-channel or 1xN/Nx1 3-channel, where N is the number of points.
 		Mat(imagePoints),	// Array of corresponding image points, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel, where N is the number of points.
 		cameraMatrix,		// Self-explanatory...
-		distCoeffs,			// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients 
-		rVecIter,			// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
-		tVecIter,			// Output translation vector
+		Mat(),			// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients 
+		rVec,			// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
+		tVec,			// Output translation vector
 		false,				// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 							//						of the rotation and translation vectors, respectively, and further optimizes them.
 		100,				// ITERATIONS COUNT, number of iterations
@@ -100,13 +98,19 @@ int PnPSolver::foo(int verbalOutput)
 	elapsedSecondsPNP = (double)(now - then) / ticksPerSecond;
 		
 	//Create the rotation matrix from the vector created above, by using the "Rodrigues"
-	rMatIter.create(3, 3, DataType<double>::type);
-	Rodrigues(rVecIter, rMatIter);
+	rMat.create(3, 3, DataType<double>::type);
+	Rodrigues(rVec, rMat);
 	//Create the translation matrix from the vector created above, by using the "Rodrigues"
-	tMatIter.create(3, 3, DataType<double>::type);
-	Rodrigues(tVecIter, tMatIter);
+	tMat.create(3, 3, DataType<double>::type);
+	Rodrigues(tVec, tMat);
 
-
+	//Instead of only keeping the 4x4 pose matrix, also keep the 3x4
+	cameraPose34.create(3,4, rMat.type());
+	// Copies the rotation matrix into the camera pose
+	cameraPose34(Range(0, 3), Range(0, 3)) = rMat.t();
+	//Copies tvec into the camera pose
+	cameraPose34(Range(0, 3), Range(3, 4)) = -(rMat.t()) * tVec;
+	
 	/*
 	*  Create the camera pose matrix
 	*
@@ -114,33 +118,21 @@ int PnPSolver::foo(int verbalOutput)
 	*			 it describes how the world is transformed relative to the camera
 	*				(how to go from world to image, or image to world coordinates).
 	*/
-	cameraPose.create(4, 4, rMatIter.type());
+	cameraPose.create(4, 4, rMat.type());
 	//Copies the rotation matrix into the camera pose
-	cameraPose(Range(0, 3), Range(0, 3)) = rMatIter.t();
+	cameraPose(Range(0, 3), Range(0, 3)) = rMat.t();
 	//Copies tvec into the camera pose
-	cameraPose(Range(0, 3), Range(3, 4)) = -(rMatIter.t()) * tVecIter;
+	cameraPose(Range(0, 3), Range(3, 4)) = -(rMat.t()) * tVec;
 	// Fill the last row of the camera pose matrix with [0, 0, 0, 1]
 	double *p = cameraPose.ptr<double>(3);
 	p[0] = p[1] = p[2] = 0; p[3] = 1;
 
-	then = cvGetTickCount();
 
-	projectPoints(						// Projects 3D points to an image plane.
-		worldPoints,					//
-		rVecIter,						// Rotation vector
-		tVecIter,						// Translation vector
-		cameraMatrix,					//
-		distCoeffs,						// Input vector of distortion coefficients. If the vector is NULL/empty, the zero distortion coefficients are assumed.
-		projectedImagePoints,			// Output array of image points, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel
-		projectionJacobian				// Jacobian, jacobian matrix of derivatives of image points with respect to components of the rotation vector, 
-										// translation vector, focal lengths, coordinates of the principal point and the distortion coefficients.
 
-										// Aspect ratio, optional (fx/fy)
-		);
+
+
+
 	
-	now = cvGetTickCount();
-	elapsedSecondsPROJ = (double)(now - then) / ticksPerSecond;
-
 
 
 	/* undistortPoints giving some funny results, not sure how to use it
@@ -173,8 +165,7 @@ int PnPSolver::foo(int verbalOutput)
 	M = m....
 	*/
 
-
-	cameraPosition.create(3, 1, DataType<double>::type);
+	
 
 	then = cvGetTickCount();
 
@@ -185,12 +176,16 @@ int PnPSolver::foo(int verbalOutput)
 		R = Rotation matrix    (R^t = R transposed)
 		t = translation vector
 
-		P = R^t (p-t)
+		P = R^t (p-t)		Previously:	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
 
 		Note that transposed rotation (R^t) does the inverse operation to original rotation but is much faster to calculate than  the inverse (R^-1).
 	*/
-	cameraPosition = rMatIter.t() * ((cameraMatrix.inv() * (Mat_<double>(3, 1) << 0,0,1)) - tVecIter);
+	cameraPosition.create(3, 1, DataType<double>::type);	
+	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 1);
 	
+	//cameraPosition = -1 * rMat.t() * tVec;
+	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
+
 	now = cvGetTickCount();
 	elapsedSecondsCPOS = (double)(now - then) / ticksPerSecond;
 	
@@ -200,38 +195,29 @@ int PnPSolver::foo(int verbalOutput)
 	cameraPositionNorm.at<double>(1, 0) = cameraPosition.at<double>(1, 0) / cameraPosition.at<double>(2, 0);
 	cameraPositionNorm.at<double>(2, 0) = 1;
 
-	
-
 	if(verbalOutput)
 	{
 		cout << endl << "***********************************************" << endl << endl;
 
 		cout << "CM =" << endl << cameraMatrix << endl << endl;
 
-		cout << "R =" << endl << rMatIter << endl << endl;
+		cout << "R =" << endl << rMat << endl << endl;
 
-		cout << "T =" << endl << tMatIter << endl << endl;
+		cout << "T =" << endl << tMat << endl << endl;
 
-		cout << "t =" << endl << tVecIter << endl << endl;
+		cout << "t =" << endl << tVec << endl << endl;
 
 		cout << "Camera pose: " << endl << cameraPose << endl << endl;
 		
 		cout << "cPos = \t" << endl << cameraPosition << endl << endl;
 		cout << "cPos norm = \t" << endl << cameraPositionNorm << endl << endl;
 		
-		cout << "Given image point\tProjected image point" << endl;
-		for (int i = 0; i < projectedImagePoints.size(); i++)
-		{
-			cout << imagePoints.at(i) << "\t" << projectedImagePoints.at(i) << endl;
-		}
+		
 		cout << endl;
 		cout << "Calibrating camera position took " << elapsedSecondsCALIB << " seconds" << endl;
 		cout << "PnP (ITERATIVE) took " << elapsedSecondsPNP << " seconds" << endl;
-		cout << "Projection of image points took " << elapsedSecondsPROJ << " seconds" << endl;
 		cout << "Calculating camera position took " << elapsedSecondsCPOS << " seconds" << endl;
 		
-
-
 		cout << endl << "***********************************************" << endl << endl;
 	}
 
@@ -266,10 +252,6 @@ PnPSolver::PnPSolver(Mat CM)
 // Use default image points, not recommended
 void PnPSolver::setImagePoints()
 {
-	
-
-	
-
 	/*
 	float	W = 4.8,
 		w = 1280.0,
@@ -307,10 +289,11 @@ void PnPSolver::setWorldPoints()
 	PnPSolver::worldPoints.push_back(Point3d(143432.948, 6394364.927, 37.656));
 	PnPSolver::worldPoints.push_back(Point3d(143427.658, 6394362.027, 38.376));
 	PnPSolver::worldPoints.push_back(Point3d(143436.316, 6394359.472, 38.452));
-	PnPSolver::worldPoints.push_back(Point3d(143462.114, 6394450.099, 38.451));
+	PnPSolver::worldPoints.push_back(Point3d(143427.048, 6394361.520, 33.577)); 
 	PnPSolver::worldPoints.push_back(Point3d(143430.465, 6394361.396, 38.098));
 	PnPSolver::worldPoints.push_back(Point3d(143437.223, 6394361.204, 39.037));
 	PnPSolver::worldPoints.push_back(Point3d(143432.753, 6394362.541, 39.446));
+
 
 	/*
 	PnPSolver::worldPoints.push_back(Point3d(143469.613, 6394456.418, 38.800));
@@ -347,19 +330,19 @@ vector<cv::Point3f> PnPSolver::getWorldPoints()
 
 Mat PnPSolver::getRotationVector()
 {
-	return PnPSolver::rVecIter;
+	return PnPSolver::rVec;
 }
 Mat PnPSolver::getRotationMatrix()
 {
-	return PnPSolver::rMatIter;
+	return PnPSolver::rMat;
 }
 Mat PnPSolver::getTranslationVector()
 {
-	return PnPSolver::tVecIter;
+	return PnPSolver::tVec;
 }
 Mat PnPSolver::getTranslationMatrix()
 {
-	return PnPSolver::tMatIter;
+	return PnPSolver::tMat;
 }
 cv::Mat PnPSolver::getCameraPose()
 {
@@ -369,14 +352,7 @@ cv::Mat PnPSolver::getCameraPosition()
 {
 	return PnPSolver::cameraPosition;
 }
-vector<cv::Point2f> PnPSolver::getProjectedImagePoints()
-{
-	return PnPSolver::projectedImagePoints;
-}
-cv::Mat PnPSolver::getProjectionJacobian()
-{
-	return PnPSolver::projectionJacobian;
-}
+
 Mat PnPSolver::getCameraMatrix()
 {
 	return PnPSolver::cameraMatrix;

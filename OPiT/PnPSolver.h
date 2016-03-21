@@ -31,10 +31,11 @@ public:
 
 	
 
-	std::vector<cv::Point2f> getProjectedImagePoints();
-	cv::Mat getProjectionJacobian();
+	
 	
 	int foo(int verbal);
+
+	cv::Mat cameraPose34;
 
 private:
 	cv::Mat cameraMatrix;
@@ -44,13 +45,11 @@ private:
 
 	std::vector<std::vector<cv::Point2f> > VoVImagePoints;
 
-	cv::Mat rVecIter, tVecIter;
-	cv::Mat rMatIter, tMatIter;
+	cv::Mat rVec, tVec;
+	cv::Mat rMat, tMat;
 	cv::Mat cameraPose, cameraPosition;
 	cv::Mat distCoeffs;
 
-	std::vector<cv::Point2f> projectedImagePoints;
-	cv::Mat projectionJacobian;
 };
 
 #endif
