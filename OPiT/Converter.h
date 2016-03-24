@@ -1,5 +1,5 @@
-#ifndef __Converter_H_INCLUDED__   // if x.h hasn't been included yet...
-#define __Converter_H_INCLUDED__
+#ifndef __CONVERTER_H_INCLUDED__   // if x.h hasn't been included yet...
+#define __CONVERTER_H_INCLUDED__
 #include <opencv2/features2d.hpp>
 #include <iostream>
 class Converter

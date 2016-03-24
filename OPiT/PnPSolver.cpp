@@ -32,33 +32,12 @@ using namespace std;
 */
 
 
-int PnPSolver::foo(int verbalOutput)
+int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
 {
 	//MEASURE THE TIME
 	int64 now, then;
-	double elapsedSecondsCALIB, elapsedSecondsPNP, elapsedSecondsPROJ, elapsedSecondsCPOS, ticksPerSecond = cvGetTickFrequency()*1.0e6;
+	double  elapsedSecondsPNP, elapsedSecondsCPOS, ticksPerSecond = cvGetTickFrequency()*1.0e6;
 
-	then = cvGetTickCount();
-
-	// Before anything, we try to calibrate the camera
-	vector< vector<Point3f> > VoVWorldPoints{ worldPoints, worldPoints };
-	distCoeffs = Mat::zeros(8, 1, CV_64F);
-	Mat cm; cameraMatrix.copyTo(cm);
-	Mat rvec, tvec;
-	calibrateCamera(	
-						VoVWorldPoints,					// A vector of vectors with the world points
-						VoVImagePoints,					// A vector of vectors with the image points
-						Size(1280,960),					// The image size
-						cm,								// Output camera matrix, but we have already defined ours
-						distCoeffs,						// The distortion coeffiecients for the camera
-						rvec, tvec,						//
-						CV_CALIB_USE_INTRINSIC_GUESS);	// Optional flags	
-
-	// Calculate time
-	now = cvGetTickCount();
-	elapsedSecondsCALIB = (double)(now - then) / ticksPerSecond;
-
-	
 	// Keep track of time
 	then = cvGetTickCount();
 
@@ -81,9 +60,9 @@ int PnPSolver::foo(int verbalOutput)
 		Mat(worldPoints),	// Array of world points in the world coordinate space, 3xN/Nx3 1-channel or 1xN/Nx1 3-channel, where N is the number of points.
 		Mat(imagePoints),	// Array of corresponding image points, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel, where N is the number of points.
 		cameraMatrix,		// Self-explanatory...
-		Mat(),			// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients 
-		rVec,			// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
-		tVec,			// Output translation vector
+		distCoeffs,			// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients 
+		rVec,				// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
+		tVec,				// Output translation vector
 		false,				// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 							//						of the rotation and translation vectors, respectively, and further optimizes them.
 		100,				// ITERATIONS COUNT, number of iterations
@@ -127,11 +106,6 @@ int PnPSolver::foo(int verbalOutput)
 	double *p = cameraPose.ptr<double>(3);
 	p[0] = p[1] = p[2] = 0; p[3] = 1;
 
-
-
-
-
-
 	
 
 
@@ -165,8 +139,6 @@ int PnPSolver::foo(int verbalOutput)
 	M = m....
 	*/
 
-	
-
 	then = cvGetTickCount();
 
 	/*	Equation taken from: http://stackoverflow.com/questions/22389896/finding-the-real-world-coordinates-of-an-image-point
@@ -188,12 +160,6 @@ int PnPSolver::foo(int verbalOutput)
 
 	now = cvGetTickCount();
 	elapsedSecondsCPOS = (double)(now - then) / ticksPerSecond;
-	
-	//Normalisation of 2D coords
-	Mat cameraPositionNorm = Mat(3, 1, DataType<double>::type);
-	cameraPositionNorm.at<double>(0, 0) = cameraPosition.at<double>(0, 0) / cameraPosition.at<double>(2, 0);
-	cameraPositionNorm.at<double>(1, 0) = cameraPosition.at<double>(1, 0) / cameraPosition.at<double>(2, 0);
-	cameraPositionNorm.at<double>(2, 0) = 1;
 
 	if(verbalOutput)
 	{
@@ -210,11 +176,8 @@ int PnPSolver::foo(int verbalOutput)
 		cout << "Camera pose: " << endl << cameraPose << endl << endl;
 		
 		cout << "cPos = \t" << endl << cameraPosition << endl << endl;
-		cout << "cPos norm = \t" << endl << cameraPositionNorm << endl << endl;
 		
 		
-		cout << endl;
-		cout << "Calibrating camera position took " << elapsedSecondsCALIB << " seconds" << endl;
 		cout << "PnP (ITERATIVE) took " << elapsedSecondsPNP << " seconds" << endl;
 		cout << "Calculating camera position took " << elapsedSecondsCPOS << " seconds" << endl;
 		
@@ -358,34 +321,3 @@ Mat PnPSolver::getCameraMatrix()
 	return PnPSolver::cameraMatrix;
 }
 
-void PnPSolver::setVoVImagePoints()
-{
-	vector<cv::Point2f> imagepoints;
-	imagepoints.push_back(Point2d(397.210571, 145.146866));
-	imagepoints.push_back(Point2d(650.494934, 129.172379));
-	imagepoints.push_back(Point2d(519.567688, 131.898239));
-	imagepoints.push_back(Point2d(531.834473, 267.480103));
-	imagepoints.push_back(Point2d(239.835358, 207.141220));
-	imagepoints.push_back(Point2d(834.740051, 174.580566));
-	imagepoints.push_back(Point2d(211.190155, 510.402740));
-	imagepoints.push_back(Point2d(437.319458, 218.244186));
-	imagepoints.push_back(Point2d(845.259948, 160.41391));
-	imagepoints.push_back(Point2d(559.729248, 170.678528));
-
-	vector<cv::Point2f> imagepoints2;
-	imagepoints2.push_back(Point2d(490, 250));
-	imagepoints2.push_back(Point2d(668, 242));
-	imagepoints2.push_back(Point2d(578, 242));
-	imagepoints2.push_back(Point2d(582, 335));
-	imagepoints2.push_back(Point2d(380, 294));
-	imagepoints2.push_back(Point2d(793, 278));
-	imagepoints2.push_back(Point2d(368, 503));
-	imagepoints2.push_back(Point2d(521, 306));
-	imagepoints2.push_back(Point2d(806, 262));
-	imagepoints2.push_back(Point2d(604, 272));
-
-	VoVImagePoints.push_back(imagepoints);
-	VoVImagePoints.push_back(imagepoints2);
-
-	
-}

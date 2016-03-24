@@ -1,5 +1,6 @@
-#ifndef __PnPSolver_H_INCLUDED__   // if x.h hasn't been included yet...
-#define __PnPSolver_H_INCLUDED__
+#ifndef __PNPSOLVER_H_INCLUDED__   // if x.h hasn't been included yet...
+#define __PNPSOLVER_H_INCLUDED__
+
 #include <opencv2/features2d.hpp>
 #include <initializer_list>
 #include <iostream>
@@ -17,8 +18,6 @@ public:
 	void setImagePoints(std::vector<cv::Point2f> IP);
 	std::vector<cv::Point2f> getImagePoints();
 
-	void setVoVImagePoints();
-
 	cv::Mat getCameraMatrix();
 	cv::Mat getCameraPose();
 	cv::Mat getCameraPosition();
@@ -33,7 +32,7 @@ public:
 
 	
 	
-	int foo(int verbal);
+	int foo(int verbal, cv::Mat distCoeffs);
 
 	cv::Mat cameraPose34;
 
@@ -43,12 +42,10 @@ private:
 	std::vector<cv::Point2f> imagePoints, imagePoints2;
 	std::vector<cv::Point3f> worldPoints;
 
-	std::vector<std::vector<cv::Point2f> > VoVImagePoints;
 
 	cv::Mat rVec, tVec;
 	cv::Mat rMat, tMat;
 	cv::Mat cameraPose, cameraPosition;
-	cv::Mat distCoeffs;
 
 };
 

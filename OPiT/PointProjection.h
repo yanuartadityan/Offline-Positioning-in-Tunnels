@@ -1,5 +1,5 @@
-#ifndef __PointProjection_H_INCLUDED__   // if x.h hasn't been included yet...
-#define __PointProjection_H_INCLUDED__
+#ifndef __POINTPROJECTION_H_INCLUDED__   // if x.h hasn't been included yet...
+#define __POINTPROJECTION_H_INCLUDED__
 #include <opencv2/features2d.hpp>
 #include <initializer_list>
 #include <iostream>
