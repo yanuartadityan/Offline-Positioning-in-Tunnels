@@ -8,7 +8,6 @@ class PnPSolver
 {
 public:
 	PnPSolver();
-	PnPSolver(cv::Mat CM);
 
 	void setWorldPoints();
 	void setWorldPoints(std::vector<cv::Point3f> WP);
@@ -18,7 +17,6 @@ public:
 	void setImagePoints(std::vector<cv::Point2f> IP);
 	std::vector<cv::Point2f> getImagePoints();
 
-	cv::Mat getCameraMatrix();
 	cv::Mat getCameraPose();
 	cv::Mat getCameraPosition();
 
@@ -28,24 +26,30 @@ public:
 	cv::Mat getRotationMatrix();
 	cv::Mat getTranslationMatrix();
 
-	
+	cv::Mat getEssentialMatrix();
+	cv::Mat getFundamentalMatrix();
+
+	void setVoVImagePoints();
 
 	
 	
-	int foo(int verbal, cv::Mat distCoeffs);
+	int foo(int verbal);
 
 	cv::Mat cameraPose34;
+	cv::Mat R, t;
 
 private:
-	cv::Mat cameraMatrix;
 	
 	std::vector<cv::Point2f> imagePoints, imagePoints2;
 	std::vector<cv::Point3f> worldPoints;
+	std::vector<std::vector<cv::Point2f> > VoVImagePoints;
 
+	cv::Mat essentialMatrix, fundamentalMatrix;
 
 	cv::Mat rVec, tVec;
 	cv::Mat rMat, tMat;
 	cv::Mat cameraPose, cameraPosition;
+
 
 };
 

@@ -15,6 +15,8 @@ public:
 
 	static cv::Mat normalize2d(cv::Mat);
 	static cv::Mat normalize3d(cv::Mat);
+
+	static std::string type2str(int);
 private:
 	
 };

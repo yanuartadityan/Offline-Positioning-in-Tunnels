@@ -7,10 +7,15 @@ class Calibration
 {
 public:
 	Calibration();
+	Calibration(cv::Mat CM);
 
-	static cv::Mat foo(cv::Mat cm, std::vector<std::vector<cv::Point2f> > vovIP, std::vector<std::vector<cv::Point3f> > vovWP);
-	cv::Mat foo(cv::Mat cm);
+	cv::Mat foo(std::vector<std::vector<cv::Point2f> > vovIP, std::vector<std::vector<cv::Point3f> > vovWP);
+	cv::Mat foo();
 	
+	cv::Mat getCameraMatrix();
+
+	cv::Mat getDistortionCoeffs();
+
 	void setVoVImagePoints();
 	void setVoVWorldPoints();
 

@@ -13,18 +13,31 @@
 using namespace cv;
 using namespace std;
 
-Calibration::Calibration()
-{
 
+
+Calibration::Calibration()										// WE HAVE TO TAKE DISTORTION INTO ACCOUNT!
+{																//							    Camera matrix
+	cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));			//								___		  ___
+	cameraMatrix.at<double>(0, 0) = 1432;						// Focal length X				| fx  0  cx |
+	cameraMatrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
+	cameraMatrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   1 |
+	cameraMatrix.at<double>(1, 2) = 481;						// Principal point Y			---		  ---
+	cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not	
+
+
+	setVoVImagePoints();
+	setVoVWorldPoints();
 }
 
-Mat Calibration::foo(Mat cameraMatrix, vector<vector<Point2f> > vovIP, vector<vector<Point3f> > vovWP)
-{
-	//MEASURE THE TIME
-	int64 now, then;
-	double elapsedSecondsCALIB, ticksPerSecond = cvGetTickFrequency()*1.0e6;
 
-	then = cvGetTickCount();
+
+Mat Calibration::getCameraMatrix()
+{
+	return Calibration::cameraMatrix;
+}
+
+Mat Calibration::foo( vector<vector<Point2f> > vovIP, vector<vector<Point3f> > vovWP)
+{
 
 	// Before anything, we try to calibrate the camera
 	Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
@@ -42,45 +55,36 @@ Mat Calibration::foo(Mat cameraMatrix, vector<vector<Point2f> > vovIP, vector<ve
 		rvec, tvec,						//
 		CV_CALIB_USE_INTRINSIC_GUESS);	// Optional flags	
 
-	// Calculate time
-	now = cvGetTickCount();
-	elapsedSecondsCALIB = (double)(now - then) / ticksPerSecond;
-
-	cout << "Calibrating camera position took " << elapsedSecondsCALIB << " seconds" << endl;
 
 	return distCoeffs;
 }
 
-Mat Calibration::foo(Mat cameraMatrix)
+Mat Calibration::foo()
 {
-	//MEASURE THE TIME
-	int64 now, then;
-	double elapsedSecondsCALIB, ticksPerSecond = cvGetTickFrequency()*1.0e6;
-
-	then = cvGetTickCount();
-
 	// Before anything, we try to calibrate the camera
 	Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
 	Mat cm; cameraMatrix.copyTo(cm);
 	Mat rvec, tvec;
 
+	// Get the distortion coefficients by looking at image + world points, and the camera matrix
 	calibrateCamera(
 		Calibration::VoVWorldPoints,	// A vector of vectors with the world points
 		Calibration::VoVImagePoints,	// A vector of vectors with the image points
 		Size(1280, 960),				// The image size
-		cm,								// Output camera matrix, but we have already defined ours
+		cameraMatrix,					// Output camera matrix, but we have already defined ours
 		Calibration::distortionCoeffs,	// The distortion coeffiecients for the camera
 		rvec, tvec,						//
 		CV_CALIB_USE_INTRINSIC_GUESS);	// Optional flags	
 
 										// Calculate time
-	now = cvGetTickCount();
-	elapsedSecondsCALIB = (double)(now - then) / ticksPerSecond;
 
-
-	cout << "Calibrating camera position took " << elapsedSecondsCALIB << " seconds" << endl;
 
 	return distortionCoeffs;
+}
+
+Mat Calibration::getDistortionCoeffs()
+{
+	return Calibration::distortionCoeffs;
 }
 
 void Calibration::pushToVoVWorldPoints(vector<Point3f> WP)
