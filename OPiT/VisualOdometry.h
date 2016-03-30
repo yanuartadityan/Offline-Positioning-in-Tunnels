@@ -11,7 +11,9 @@ enum
     VO_METHOD_SIFT = 1,
     VO_METHOD_SURF = 2,
     VO_METHOD_LUKASKANADE = 3,
-    VO_METHOD_AKAZE = 4
+    VO_METHOD_AKAZE = 4,
+    VO_METHOD_ORB = 5,
+    VO_METHOD_FASTSIFT = 6
 };
 
 class VO
@@ -25,7 +27,6 @@ public:
     
 private:
     cv::Mat cameraMatrix;
-
 	cv::Mat rVec, tVec;
 	cv::Mat rMat, tMat;
 	cv::Mat cameraPose, cameraPosition;
@@ -36,9 +37,10 @@ private:
     void featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2, int vo_method);
     void fastDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
     void siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
-    void surfDetection();
+    void surfDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
     void akazeDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
-    void findPoses(cv::Mat prevImg, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2);
+    void fastSiftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
+    void findPoses(cv::Mat prevImg, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2, int vo_method);
     void drawPoints(cv::Mat img, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2);
     
     // param
@@ -46,6 +48,7 @@ private:
     float reprojectionError;
     double confidence;
     int method;
+    int vo_method;
     
     // fast param
     int fast_threshold;
