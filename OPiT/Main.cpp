@@ -40,7 +40,12 @@ int main(int argc, char** argv)
     VO visodo;
     
     char pathname[100];
+
+#ifndef KITTI_DATASET
     sprintf(pathname, "/Users/januaditya/Workspace/_opencv/ocv-voup/images/raw/");
+#else
+    sprintf(pathname, "/Users/januaditya/Thesis/exjobb-data/kitti-odometry/dataset/sequences/00/image_0/");
+#endif
     
     visodo.setImagePath(pathname);
     visodo.initParameter();
