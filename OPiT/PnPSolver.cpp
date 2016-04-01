@@ -1,5 +1,6 @@
 #include "PnPSolver.h"
 #include "Converter.h"
+#include "Calibration.h"
 
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -30,53 +31,101 @@ using namespace std;
 
 	
 */
-
-
-int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
+PnPSolver::PnPSolver()
 {
-	//MEASURE THE TIME
-	int64 now, then;
-	double  elapsedSecondsPNP, elapsedSecondsCPOS, ticksPerSecond = cvGetTickFrequency()*1.0e6;
+	setWorldPoints();
+	setVoVImagePoints();
 
-	// Keep track of time
-	then = cvGetTickCount();
+	
+	
+
+
+	
+}
+
+int PnPSolver::foo(int verbalOutput)
+{
+	
+	Calibration calib;
+
+
+	Mat mask;
+	Mat cameraMatrix = calib.getCameraMatrix();
+	/*
+	findEssentialMat() declared in: https://github.com/Itseez/opencv/blob/master/modules/calib3d/src/five-point.cpp
+	*/
+	essentialMatrix = findEssentialMat(
+		VoVImagePoints[0],					// Array of N (N >= 5) 2D points from the first image.The point coordinates should be floating - point(single or double precision).
+		VoVImagePoints[1],					// Array of the second image points of the same size and format as points1 .
+		cameraMatrix,
+		RANSAC,								// Method for computing a fundamental matrix.
+
+		0.99,								// Parameter used for the RANSAC. It specifies a desirable level of confidence (probability) that the estimated matrix is correct.
+
+		3,									// RANSAC threshold, the maximum distance from a point to an epipolar line in pixels, 
+											//  beyond which the point is considered an outlier and is not used for computing the final fundamental matrix.
+											//   It can be set to something like 1 - 3, depending on the accuracy of the point localization, image resolution, and the image noise.
+
+		mask								// Output array of N elements, every element of which is set to 0 for outliers and to 1 for the other points.The array is computed only in the RANSAC and LMedS methods.
+		);
+
+	fundamentalMatrix = findFundamentalMat(
+		VoVImagePoints[0],					// Take the first vector of points (the first image)
+		VoVImagePoints[1],					// ...And the second
+		CV_FM_RANSAC						// Use RANSAC
+		);
+
+	/*
+	recoverPose() described here: http://docs.opencv.org/3.0-beta/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#recoverpose
+	*/
+	recoverPose(
+		essentialMatrix,
+		VoVImagePoints[0],
+		VoVImagePoints[1],
+		R,
+		t,
+		cameraMatrix.at<double>(0, 0),
+		Point2d(cameraMatrix.at<double>(0, 2), cameraMatrix.at<double>(1, 2)),
+		mask
+		);
+
+
+
+
 
 	Mat inliers;
 	/*
-		solvePnPRansac(): Finds an object pose from 3D-2D point correspondences using the RANSAC scheme.
+	solvePnPRansac(): Finds an object pose from 3D-2D point correspondences using the RANSAC scheme.
 
-		The function estimates an object pose given a set of object points, their corresponding image projections, 
-		as well as the camera matrix and the distortion coefficients. This function finds such a pose that minimizes reprojection error, 
-		that is, the sum of squared distances between the observed projections imagePoints and the projected (using projectPoints() ) objectPoints. 
-		The use of RANSAC makes the function resistant to outliers. 
-		The function is parallelized with the TBB library.
+	The function estimates an object pose given a set of object points, their corresponding image projections,
+	as well as the camera matrix and the distortion coefficients. This function finds such a pose that minimizes reprojection error,
+	that is, the sum of squared distances between the observed projections imagePoints and the projected (using projectPoints() ) objectPoints.
+	The use of RANSAC makes the function resistant to outliers.
+	The function is parallelized with the TBB library.
 
-		Basically it estimates how the "world" is rotated relative to camera.
+	Basically it estimates how the "world" is rotated relative to camera.
 	*/
 	/*
-		Use zero distortion, or the distcoeff calculated by calibrateCamera()?
+	Use zero distortion, or the distcoeff calculated by calibrateCamera()?
 	*/
 	solvePnPRansac(
-		Mat(worldPoints),	// Array of world points in the world coordinate space, 3xN/Nx3 1-channel or 1xN/Nx1 3-channel, where N is the number of points.
-		Mat(imagePoints),	// Array of corresponding image points, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel, where N is the number of points.
-		cameraMatrix,		// Self-explanatory...
-		distCoeffs,			// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients 
-		rVec,				// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
-		tVec,				// Output translation vector
-		false,				// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
-							//						of the rotation and translation vectors, respectively, and further optimizes them.
-		100,				// ITERATIONS COUNT, number of iterations
-		8,					// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
-		0.99,				// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
-		//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
-		inliers,			// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
-		CV_ITERATIVE);		// FLAGS, method for solving a PnP problem.
+		Mat(worldPoints),			// Array of world points in the world coordinate space, 3xN/Nx3 1-channel or 1xN/Nx1 3-channel, where N is the number of points.
+		Mat(imagePoints),			// Array of corresponding image points, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel, where N is the number of points.
+		calib.getCameraMatrix(),				// Self-explanatory...
+		calib.getDistortionCoeffs(),// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients 
+		rVec,						// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
+		tVec,						// Output translation vector
+		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
+									//						of the rotation and translation vectors, respectively, and further optimizes them.
+		100,						// ITERATIONS COUNT, number of iterations
+		8,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
+		0.99,						// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
+									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
+		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
+		CV_ITERATIVE);				// FLAGS, method for solving a PnP problem.
 
-	// Calculate time
-	now = cvGetTickCount();
-	elapsedSecondsPNP = (double)(now - then) / ticksPerSecond;
-		
-	//Create the rotation matrix from the vector created above, by using the "Rodrigues"
+
+									//Create the rotation matrix from the vector created above, by using the "Rodrigues"
 	rMat.create(3, 3, DataType<double>::type);
 	Rodrigues(rVec, rMat);
 	//Create the translation matrix from the vector created above, by using the "Rodrigues"
@@ -84,12 +133,12 @@ int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
 	Rodrigues(tVec, tMat);
 
 	//Instead of only keeping the 4x4 pose matrix, also keep the 3x4
-	cameraPose34.create(3,4, rMat.type());
+	cameraPose34.create(3, 4, rMat.type());
 	// Copies the rotation matrix into the camera pose
 	cameraPose34(Range(0, 3), Range(0, 3)) = rMat.t();
 	//Copies tvec into the camera pose
 	cameraPose34(Range(0, 3), Range(3, 4)) = -(rMat.t()) * tVec;
-	
+
 	/*
 	*  Create the camera pose matrix
 	*
@@ -106,7 +155,6 @@ int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
 	double *p = cameraPose.ptr<double>(3);
 	p[0] = p[1] = p[2] = 0; p[3] = 1;
 
-	
 
 
 	/* undistortPoints giving some funny results, not sure how to use it
@@ -125,48 +173,71 @@ int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
 	*/
 
 
-	/*
-	NOT BEING USED
 
-	Assume:
-	m = camera position in image coordinates
-	A = camera matrix
-	M = camera position in world coordinates
-	then:
-	m = A [R | t] M
-
-	Thus, if we want the world coordinates of the camera:
-	M = m....
-	*/
-
-	then = cvGetTickCount();
 
 	/*	Equation taken from: http://stackoverflow.com/questions/22389896/finding-the-real-world-coordinates-of-an-image-point
 
-		P = Position in world coordinates (assume this is (x, y, z, 1))
-		p = Position in image coordinates (assume this is (0, 0, 1))
-		R = Rotation matrix    (R^t = R transposed)
-		t = translation vector
+	P = Position in world coordinates (assume this is (x, y, z, 1))
+	p = Position in image coordinates (assume this is (0, 0, 1))
+	R = Rotation matrix    (R^t = R transposed)
+	t = translation vector
 
-		P = R^t (p-t)		Previously:	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
+	P = R^t (p-t)		Previously:	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
 
-		Note that transposed rotation (R^t) does the inverse operation to original rotation but is much faster to calculate than  the inverse (R^-1).
+	Note that transposed rotation (R^t) does the inverse operation to original rotation but is much faster to calculate than  the inverse (R^-1).
 	*/
-	cameraPosition.create(3, 1, DataType<double>::type);	
+	cameraPosition.create(3, 1, DataType<double>::type);
 	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 1);
-	
-	//cameraPosition = -1 * rMat.t() * tVec;
-	//cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
-    cameraPosition = -1 * rMat.t() * tVec;
 
-	now = cvGetTickCount();
-	elapsedSecondsCPOS = (double)(now - then) / ticksPerSecond;
+	//cameraPosition = -1 * rMat.t() * tVec;
+	cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
+
+
+
+
+	/*
+		Taken from: https://en.wikipedia.org/wiki/Essential_matrix#3D_points_from_corresponding_image_points
+	*/
+	Mat rMatRow1 = rMat.row(1), rMatRow3 = rMat.row(2);
+
+	Mat y = (Mat_<float>(1, 3) << VoVImagePoints[0][0].x, VoVImagePoints[0][0].y, 1.0f );
+	y.convertTo(y, CV_64FC1);
+	
+	/*    
+		From: http://www.nature.com/nature/journal/v293/n5828/pdf/293133a0.pdf
+
+		SUPER WEIRD RESULTS
+			Guess some of the matrices are used incorrectly.
+	*/
+ 	Mat Z1 = ( (rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * tVec);
+	//cout << "Z1 = " << Z1 << endl;
+	Mat Z2 = (Mat_<float>(1, 3)); Z2 = ((rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * y.t());
+	//cout << "Z2  = " << Z2 << endl;
+
+	Mat Z = Z1 / Z2;
+	
+
+	Mat Y = Z * VoVImagePoints[0][0].y;
+	Mat X = Z * VoVImagePoints[0][0].x;
+
+
+	cout << "Unprimed X Y Z = " << endl << X << endl << Y << endl << Z << endl << endl;
+
+	Mat XX = rMat * (X - tVec);
+	Mat YY = rMat * (Y - tVec);
+	Mat ZZ = rMat * (Z - tVec);
+
+	cout << "Primed X Y Z = " << endl << XX << endl << endl << YY << endl << endl << ZZ << endl << endl;
 
 	if(verbalOutput)
 	{
 		cout << endl << "***********************************************" << endl << endl;
 
-		cout << "CM =" << endl << cameraMatrix << endl << endl;
+		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
+
+		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
+
+		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
 
 		cout << "R =" << endl << rMat << endl << endl;
 
@@ -179,9 +250,6 @@ int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
 		cout << "cPos = \t" << endl << cameraPosition << endl << endl;
 		
 		
-		cout << "PnP (ITERATIVE) took " << elapsedSecondsPNP << " seconds" << endl;
-		cout << "Calculating camera position took " << elapsedSecondsCPOS << " seconds" << endl;
-		
 		cout << endl << "***********************************************" << endl << endl;
 	}
 
@@ -190,28 +258,7 @@ int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
 	return 0;
 }
 
-PnPSolver::PnPSolver()											// WE HAVE TO TAKE DISTORTION INTO ACCOUNT!
-{																//							    Camera matrix
-	cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));			//								___		  ___
-	cameraMatrix.at<double>(0, 0) = 1432;						// Focal length X				| fx  0  cx |
-	cameraMatrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
-	cameraMatrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   1 |
-	cameraMatrix.at<double>(1, 2) = 481;						// Principal point Y			---		  ---
-	cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not	
 
-}
-
-PnPSolver::PnPSolver(Mat CM)
-{
-	if (cameraMatrix.rows != 3)
-		cerr << "WRONG NR OF ROWS, MUST BE 3" << endl;
-	else if (cameraMatrix.cols != 3)
-		cerr << "WRONG NR OF COLUMNS, MUST BE 3" << endl;
-
-	cameraMatrix.copyTo(PnPSolver::cameraMatrix);
-
-	
-}
 
 // Use default image points, not recommended
 void PnPSolver::setImagePoints()
@@ -317,8 +364,47 @@ cv::Mat PnPSolver::getCameraPosition()
 	return PnPSolver::cameraPosition;
 }
 
-Mat PnPSolver::getCameraMatrix()
+cv::Mat PnPSolver::getEssentialMatrix()
 {
-	return PnPSolver::cameraMatrix;
+	return PnPSolver::essentialMatrix;
 }
 
+cv::Mat PnPSolver::getFundamentalMatrix()
+{
+	return PnPSolver::fundamentalMatrix;
+}
+
+// The initial frames have different 2D coordinates for the points
+void PnPSolver::setVoVImagePoints()
+{
+	vector<Point2f> imagepoints;
+	imagepoints.push_back(Point2d(397.210571, 145.146866));
+	imagepoints.push_back(Point2d(650.494934, 129.172379));
+	imagepoints.push_back(Point2d(519.567688, 131.898239));
+	imagepoints.push_back(Point2d(531.834473, 267.480103));
+	imagepoints.push_back(Point2d(239.835358, 207.141220));
+	imagepoints.push_back(Point2d(834.740051, 174.580566));
+	imagepoints.push_back(Point2d(211.190155, 510.402740));
+	imagepoints.push_back(Point2d(437.319458, 218.244186));
+	imagepoints.push_back(Point2d(845.259948, 160.41391));
+	imagepoints.push_back(Point2d(559.729248, 170.678528));
+
+	vector<Point2f> imagepoints2;
+	imagepoints2.push_back(Point2d(490, 250));
+	imagepoints2.push_back(Point2d(668, 242));
+	imagepoints2.push_back(Point2d(578, 242));
+	imagepoints2.push_back(Point2d(582, 335));
+	imagepoints2.push_back(Point2d(380, 294));
+	imagepoints2.push_back(Point2d(793, 278));
+	imagepoints2.push_back(Point2d(368, 503));
+	imagepoints2.push_back(Point2d(521, 306));
+	imagepoints2.push_back(Point2d(806, 262));
+	imagepoints2.push_back(Point2d(604, 272));
+
+
+
+	PnPSolver::VoVImagePoints.push_back(imagepoints);
+	PnPSolver::VoVImagePoints.push_back(imagepoints2);
+
+
+}
