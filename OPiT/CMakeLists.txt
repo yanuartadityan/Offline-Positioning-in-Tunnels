@@ -28,7 +28,7 @@ file (GLOB src_files
 list (REMOVE_ITEM src_files ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp)
 
 #compile flag
-add_definitions(-DKITTI_DATASET)
+# add_definitions(-DKITTI_DATASET)
 
 #build the library for the source files
 add_library (src ${src_files})
