@@ -128,7 +128,7 @@ int pclWrapper (int argc, char** argv)
     //            << " data points (" << pcl::getFieldsList (*point_cloud_ptr_filtered) << ").";
     
     if (single_view)
-        viewer = View1(point_cloud_ptr_filtered);
+        viewer = View1(point_cloud_ptr);
     else
         viewer = View2(point_cloud_ptr, point_cloud2_ptr);
     

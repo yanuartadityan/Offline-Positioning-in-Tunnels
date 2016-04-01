@@ -279,13 +279,13 @@ void PnPSolver::setImagePoints()
 	*/
 }
 
-void PnPSolver::setImagePoints(vector<Point2f> IP)
+void PnPSolver::setImagePoints(vector<Point2d> IP)
 {
 	
 	PnPSolver::imagePoints = IP;
 }
 
-vector<cv::Point2f> PnPSolver::getImagePoints()
+vector<cv::Point2d> PnPSolver::getImagePoints()
 {
 	return PnPSolver::imagePoints;
 }
@@ -328,16 +328,15 @@ void PnPSolver::setWorldPoints()
 	*/
 }
 
-void PnPSolver::setWorldPoints(vector<Point3f> WP)
+void PnPSolver::setWorldPoints(vector<Point3d> WP)
 {
 	PnPSolver::worldPoints = WP;
 }
 
-vector<cv::Point3f> PnPSolver::getWorldPoints()
+vector<cv::Point3d> PnPSolver::getWorldPoints()
 {
 	return PnPSolver::worldPoints;
 }
-
 
 Mat PnPSolver::getRotationVector()
 {
@@ -377,7 +376,7 @@ cv::Mat PnPSolver::getFundamentalMatrix()
 // The initial frames have different 2D coordinates for the points
 void PnPSolver::setVoVImagePoints()
 {
-	vector<Point2f> imagepoints;
+	vector<Point2d> imagepoints;
 	imagepoints.push_back(Point2d(397.210571, 145.146866));
 	imagepoints.push_back(Point2d(650.494934, 129.172379));
 	imagepoints.push_back(Point2d(519.567688, 131.898239));
@@ -389,7 +388,7 @@ void PnPSolver::setVoVImagePoints()
 	imagepoints.push_back(Point2d(845.259948, 160.41391));
 	imagepoints.push_back(Point2d(559.729248, 170.678528));
 
-	vector<Point2f> imagepoints2;
+	vector<Point2d> imagepoints2;
 	imagepoints2.push_back(Point2d(490, 250));
 	imagepoints2.push_back(Point2d(668, 242));
 	imagepoints2.push_back(Point2d(578, 242));
@@ -400,8 +399,6 @@ void PnPSolver::setVoVImagePoints()
 	imagepoints2.push_back(Point2d(521, 306));
 	imagepoints2.push_back(Point2d(806, 262));
 	imagepoints2.push_back(Point2d(604, 272));
-
-
 
 	PnPSolver::VoVImagePoints.push_back(imagepoints);
 	PnPSolver::VoVImagePoints.push_back(imagepoints2);

@@ -10,12 +10,12 @@ public:
 	PnPSolver();
 
 	void setWorldPoints();
-	void setWorldPoints(std::vector<cv::Point3f> WP);
-	std::vector<cv::Point3f> getWorldPoints();
+	void setWorldPoints(std::vector<cv::Point3d> WP);
+	std::vector<cv::Point3d> getWorldPoints();
 
 	void setImagePoints();
-	void setImagePoints(std::vector<cv::Point2f> IP);
-	std::vector<cv::Point2f> getImagePoints();
+	void setImagePoints(std::vector<cv::Point2d> IP);
+	std::vector<cv::Point2d> getImagePoints();
 
 	cv::Mat getCameraPose();
 	cv::Mat getCameraPosition();
@@ -40,9 +40,9 @@ public:
 
 private:
 	
-	std::vector<cv::Point2f> imagePoints, imagePoints2;
-	std::vector<cv::Point3f> worldPoints;
-	std::vector<std::vector<cv::Point2f> > VoVImagePoints;
+	std::vector<cv::Point2d> imagePoints, imagePoints2;
+	std::vector<cv::Point3d> worldPoints;
+	std::vector<std::vector<cv::Point2d> > VoVImagePoints;
 
 	cv::Mat essentialMatrix, fundamentalMatrix;
 
