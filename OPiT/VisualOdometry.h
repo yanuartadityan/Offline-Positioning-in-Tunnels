@@ -44,6 +44,7 @@ private:
     void drawPoints(cv::Mat img, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2);
     
     // param
+    double imageScale;
     int iterationsCount;
     float reprojectionError;
     double confidence;

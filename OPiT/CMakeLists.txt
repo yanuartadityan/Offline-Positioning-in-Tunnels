@@ -9,10 +9,10 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 #pcl
-# find_package (PCL 1.6 REQUIRED)
-# include_directories(${PCL_INCLUDE_DIRS} )
-# link_directories(${PCL_LIBRARY_DIRS})
-# add_definitions(${PCL_DEFINITIONS})
+find_package (PCL 1.6 REQUIRED)
+include_directories(${PCL_INCLUDE_DIRS} )
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 
 #opencl
 # find_package(OpenCL REQUIRED)
@@ -28,7 +28,11 @@ file (GLOB src_files
 list (REMOVE_ITEM src_files ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp)
 
 #compile flag
-add_definitions(-DKITTI_DATASET)
+# add_definitions(-DKITTI_DATASET)
+
+if (__APPLE__)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x")
+endif()
 
 #build the library for the source files
 add_library (src ${src_files})
@@ -37,4 +41,4 @@ add_library (src ${src_files})
 add_executable(OPiT Main.cpp)
 
 #linker
-target_link_libraries(OPiT src ${OpenCV_LIBS})
+target_link_libraries(OPiT src ${OpenCV_LIBS} ${PCL_LIBRARIES})
