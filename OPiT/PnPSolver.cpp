@@ -22,30 +22,30 @@ using namespace std;
 
 	solvePnP outputs the translation in the same unit as we specify world points in (currently the sweref 99?).
 
-	
+
 	Some good stuff
 		 http://docs.opencv.org/2.4/doc/tutorials/calib3d/camera_calibration/camera_calibration.html
 		http://ksimek.github.io/2012/08/22/extrinsic/
 		http://joelgranados.com/2010/07/30/opencv-camera-extrinsics/
 		http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_calib3d/py_pose/py_pose.html
 
-	
+
 */
 PnPSolver::PnPSolver()
 {
 	setWorldPoints();
 	setVoVImagePoints();
 
-	
-	
 
 
-	
+
+
+
 }
 
 int PnPSolver::foo(int verbalOutput)
 {
-	
+
 	Calibration calib;
 
 
@@ -62,7 +62,7 @@ int PnPSolver::foo(int verbalOutput)
 
 		0.99,								// Parameter used for the RANSAC. It specifies a desirable level of confidence (probability) that the estimated matrix is correct.
 
-		3,									// RANSAC threshold, the maximum distance from a point to an epipolar line in pixels, 
+		3,									// RANSAC threshold, the maximum distance from a point to an epipolar line in pixels,
 											//  beyond which the point is considered an outlier and is not used for computing the final fundamental matrix.
 											//   It can be set to something like 1 - 3, depending on the accuracy of the point localization, image resolution, and the image noise.
 
@@ -112,7 +112,7 @@ int PnPSolver::foo(int verbalOutput)
 		Mat(worldPoints),			// Array of world points in the world coordinate space, 3xN/Nx3 1-channel or 1xN/Nx1 3-channel, where N is the number of points.
 		Mat(imagePoints),			// Array of corresponding image points, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel, where N is the number of points.
 		calib.getCameraMatrix(),				// Self-explanatory...
-		calib.getDistortionCoeffs(),// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients 
+		calib.getDistortionCoeffs(),// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients
 		rVec,						// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
 		tVec,						// Output translation vector
 		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
@@ -160,7 +160,7 @@ int PnPSolver::foo(int verbalOutput)
 	/* undistortPoints giving some funny results, not sure how to use it
 
 	vector<Point2f> uImagePoints;
-	
+
 	undistortPoints(projectedImagePoints, uImagePoints, cameraMatrix, distCoeffs);
 
 	cout << endl << endl << "******************************************" << endl;
@@ -202,8 +202,8 @@ int PnPSolver::foo(int verbalOutput)
 
 	Mat y = (Mat_<float>(1, 3) << VoVImagePoints[0][0].x, VoVImagePoints[0][0].y, 1.0f );
 	y.convertTo(y, CV_64FC1);
-	
-	/*    
+
+	/*
 		From: http://www.nature.com/nature/journal/v293/n5828/pdf/293133a0.pdf
 
 		SUPER WEIRD RESULTS
@@ -215,7 +215,7 @@ int PnPSolver::foo(int verbalOutput)
 	//cout << "Z2  = " << Z2 << endl;
 
 	Mat Z = Z1 / Z2;
-	
+
 
 	Mat Y = Z * VoVImagePoints[0][0].y;
 	Mat X = Z * VoVImagePoints[0][0].x;
@@ -246,14 +246,14 @@ int PnPSolver::foo(int verbalOutput)
 		cout << "t =" << endl << tVec << endl << endl;
 
 		cout << "Camera pose: " << endl << cameraPose << endl << endl;
-		
+
 		cout << "cPos = \t" << endl << cameraPosition << endl << endl;
-		
-		
+
+
 		cout << endl << "***********************************************" << endl << endl;
 	}
 
-	
+
 
 	return 0;
 }
@@ -270,7 +270,7 @@ void PnPSolver::setImagePoints()
 		h = 960,
 		f = 1432,
 		F = Converter::ImageToWorldF(f, W, w);
-		
+
 	// Converted from pixels to meters
 	PnPSolver::imagePoints.push_back(Point2d(Converter::ImageToWorldX(384.3331f, W, w), Converter::ImageToWorldY(162.23618f, H, h)));
 	PnPSolver::imagePoints.push_back(Point2d(Converter::ImageToWorldX(385.27521f, W, w), Converter::ImageToWorldY(135.21503f, H, h)));
@@ -281,7 +281,7 @@ void PnPSolver::setImagePoints()
 
 void PnPSolver::setImagePoints(vector<Point2f> IP)
 {
-	
+
 	PnPSolver::imagePoints = IP;
 }
 
@@ -300,7 +300,7 @@ void PnPSolver::setWorldPoints()
 	PnPSolver::worldPoints.push_back(Point3d(143432.948, 6394364.927, 37.656));
 	PnPSolver::worldPoints.push_back(Point3d(143427.658, 6394362.027, 38.376));
 	PnPSolver::worldPoints.push_back(Point3d(143436.316, 6394359.472, 38.452));
-	PnPSolver::worldPoints.push_back(Point3d(143427.048, 6394361.520, 33.577)); 
+	PnPSolver::worldPoints.push_back(Point3d(143427.048, 6394361.520, 33.577));
 	PnPSolver::worldPoints.push_back(Point3d(143430.465, 6394361.396, 38.098));
 	PnPSolver::worldPoints.push_back(Point3d(143437.223, 6394361.204, 39.037));
 	PnPSolver::worldPoints.push_back(Point3d(143432.753, 6394362.541, 39.446));

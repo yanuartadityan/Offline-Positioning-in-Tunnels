@@ -22,7 +22,7 @@ void printUsage (const char* progName)
 boost::shared_ptr<pcl::visualization::PCLVisualizer> View1 (pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud)
 {
     Eigen::Affine3f t;
-    
+
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
     viewer->addPointCloud<pcl::PointXYZ> (cloud, "sample cloud");
@@ -33,7 +33,7 @@ boost::shared_ptr<pcl::visualization::PCLVisualizer> View1 (pcl::PointCloud<pcl:
     //viewer->setCameraPosition(143430.453, 6394363, 39.8569984, 0, 1, 0);
     //viewer->setCameraFieldOfView(45, 0);
 //    viewer->updateCamera();
-    
+
     return (viewer);
 }
 
@@ -126,12 +126,12 @@ int pclWrapper (int argc, char** argv)
     // save to the file
     //std::cerr   << "PointCloud after filtering: " << point_cloud_ptr_filtered->width * point_cloud_ptr_filtered->height
     //            << " data points (" << pcl::getFieldsList (*point_cloud_ptr_filtered) << ").";
-    
+
     if (single_view)
-        viewer = View1(point_cloud_ptr_filtered);
+        viewer = View1(point_cloud_ptr);
     else
         viewer = View2(point_cloud_ptr, point_cloud2_ptr);
-    
+
 
     //----------------------------------------------------
     // Main loop
