@@ -36,7 +36,7 @@ VO::VO()											// WE HAVE TO TAKE DISTORTION INTO ACCOUNT!
 {																//							    Camera matrix
     cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));			//								___		  ___
     imageScale = 1.0f;
-    
+
 #ifndef KITTI_DATASET
 	cameraMatrix.at<double>(0, 0) = 1432.f/imageScale;						// Focal length X				| fx  0  cx |
 	cameraMatrix.at<double>(1, 1) = 1432.f/imageScale;						// Focal length Y				| 0  fy  cy |
@@ -80,7 +80,7 @@ void VO::visualodometry()
         resize(firstImage, firstImage, Size(firstImage.cols/imageScale, firstImage.rows/imageScale));
         resize(secondImage, secondImage, Size(secondImage.cols/imageScale, secondImage.rows/imageScale));
     }
-    
+
     // 3. feature detection on first and second images
     vector<Point2f> points1, points2;        //vectors to store the coordinates of the feature points
     featureDetection(firstImage, points1, secondImage, points2, vo_method);
@@ -239,15 +239,9 @@ void VO::fastDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
     vector<float> err;
     Size winSize=Size(21,21);
     TermCriteria termcrit=TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01);
-<<<<<<< HEAD
 
     calcOpticalFlowPyrLK(img1, img2, points1, points2, status, err, winSize, 3, termcrit, 0, 0.001);
 
-=======
-    
-    //calcOpticalFlowPyrLK(img1, img2, points1, points2, status, err, winSize, 3, termcrit, 0, 0.001);
-    
->>>>>>> Klumpen/master
     //getting rid of points for which the KLT tracking failed or those who have gone outside the frame
     int indexCorrection = 0;
     for( int i=0; i<status.size(); i++)
