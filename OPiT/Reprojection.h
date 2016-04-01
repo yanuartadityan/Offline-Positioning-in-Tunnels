@@ -1,3 +1,4 @@
+#include <opencv2/features2d.hpp>
 class Reprojection
 {
 public:

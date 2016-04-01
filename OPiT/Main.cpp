@@ -16,6 +16,7 @@
 #include "PnPSolver.h"
 #include "PointProjection.h"
 #include "Converter.h"
+#include "PCLTest.h"
 
 #include <iostream>
 
@@ -48,7 +49,7 @@ int main(int argc, char** argv)
 	cout << endl << endl << endl << endl << endl << endl;
 	cout << endl << endl << "camera 1 position: " << endl << solver1.getCameraPosition() << endl << "camera 2 position: " << endl << solver2.getCameraPosition() << endl;
 	
-
+	PCLTest::foo();
 
 	
 	SIFTdetector::foo();

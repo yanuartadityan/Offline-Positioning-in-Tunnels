@@ -36,14 +36,26 @@ PnPSolver::PnPSolver()
 	setWorldPoints();
 	setVoVImagePoints();
 
-	Mat mask;
+	
+	
+
+
+	
+}
+
+int PnPSolver::foo(int verbalOutput)
+{
+	
 	Calibration calib;
+
+
+	Mat mask;
 	Mat cameraMatrix = calib.getCameraMatrix();
 	/*
 	findEssentialMat() declared in: https://github.com/Itseez/opencv/blob/master/modules/calib3d/src/five-point.cpp
 	*/
 	essentialMatrix = findEssentialMat(
-		VoVImagePoints[0],					// Array of N(N >= 5) 2D points from the first image.The point coordinates should be floating - point(single or double precision).
+		VoVImagePoints[0],					// Array of N (N >= 5) 2D points from the first image.The point coordinates should be floating - point(single or double precision).
 		VoVImagePoints[1],					// Array of the second image points of the same size and format as points1 .
 		cameraMatrix,
 		RANSAC,								// Method for computing a fundamental matrix.
@@ -78,16 +90,8 @@ PnPSolver::PnPSolver()
 		);
 
 
-	
 
 
-	
-}
-
-int PnPSolver::foo(int verbalOutput)
-{
-	
-	Calibration calib;
 
 	Mat inliers;
 	/*

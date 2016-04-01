@@ -224,7 +224,7 @@ void VO::fastDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
     Size winSize=Size(21,21);
     TermCriteria termcrit=TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01);
     
-    calcOpticalFlowPyrLK(img1, img2, points1, points2, status, err, winSize, 3, termcrit, 0, 0.001);
+    //calcOpticalFlowPyrLK(img1, img2, points1, points2, status, err, winSize, 3, termcrit, 0, 0.001);
     
     //getting rid of points for which the KLT tracking failed or those who have gone outside the frame
     int indexCorrection = 0;
