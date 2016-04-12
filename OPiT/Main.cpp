@@ -11,11 +11,12 @@
 #include <opencv2/opencv.hpp>
 
 #include "Triangulation.h"
-#include "SIFTdetector.h"
+#include "FeatureDetection.h"
 #include "Calibration.h"
 #include "PnPSolver.h"
 #include "PointProjection.h"
 #include "Converter.h"
+#include "VisualOdometry.h"
 #include "PCLTest.h"
 
 #include <iostream>
@@ -27,12 +28,29 @@ using namespace cv;
 int main(int argc, char** argv)
 {
 	//Calibration moved to its own class.
-	Calibration calib;
-	Mat distCoeffs = calib.getDistortionCoeffs();
-
-
+    Calibration calib;
 	PnPSolver solver1, solver2;
+	VO vodometry;
+    FeatureDetection fdetect;
+    
+    Mat distCoeffs = calib.getDistortionCoeffs();
 
+#ifndef KITTI_DATASET
+    char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/out0/";
+#else
+    char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/kitti-odometry/dataset/sequences/00/image_0/";
+#endif
+    
+    // CHECKING THE IMAGE QUALITY PER DIFFERENT FEATURE DETECTION
+//    fdetect.computeKeypointsAndDraw(pathname);
+    
+    // VISUAL ODOMETRY
+    vodometry.initParameter();
+    vodometry.setImagePath(pathname);
+    vodometry.visualodometry();
+
+    
+    // MANUAL CORRESPONDENCES PNP SOLVER
 	cout << "Starting first solver............." << endl << endl << endl;
 
 	vector<Point2d> imageOne;
@@ -52,17 +70,11 @@ int main(int argc, char** argv)
 	//  So the 2D image points will be different of course...
 
 	vector<Point2d> imageTwo;
-	imageTwo.push_back(Point2d(490, 250));
-	imageTwo.push_back(Point2d(668, 242));
-	imageTwo.push_back(Point2d(578, 242));
-	imageTwo.push_back(Point2d(582, 335));
-	imageTwo.push_back(Point2d(380, 294));
-	imageTwo.push_back(Point2d(793, 278));
-	imageTwo.push_back(Point2d(367, 499));
-	imageTwo.push_back(Point2d(521, 306));
-	imageTwo.push_back(Point2d(806, 262));
-	imageTwo.push_back(Point2d(604, 272));
-
+	imageTwo.push_back(Point2d(490, 250));	imageTwo.push_back(Point2d(668, 242));
+	imageTwo.push_back(Point2d(578, 242));	imageTwo.push_back(Point2d(582, 335));
+	imageTwo.push_back(Point2d(380, 294));	imageTwo.push_back(Point2d(793, 278));
+	imageTwo.push_back(Point2d(367, 499));	imageTwo.push_back(Point2d(521, 306));
+	imageTwo.push_back(Point2d(806, 262));	imageTwo.push_back(Point2d(604, 272));
 
 	solver2.setImagePoints(imageTwo);
 	solver2.foo(1);
@@ -70,10 +82,10 @@ int main(int argc, char** argv)
 	cout << endl << endl << endl << endl << endl << endl;
 	cout << endl << endl << "camera 1 position: " << endl << solver1.getCameraPosition() << endl << "camera 2 position: " << endl << solver2.getCameraPosition() << endl;
 
+    
+    // IDK WHAT IS THIS
 	PCLTest::foo();
-
-
-	SIFTdetector::foo();
+	FeatureDetection::foo();
 
 	int counter = 0;
 
@@ -102,11 +114,6 @@ int main(int argc, char** argv)
 			continue;
 		}
 
-
-
-
-
-
 		counter++;
 
 		// frame1 will hold the previous frame, and in the next iteration we will read a new frame into frame2
@@ -117,7 +124,6 @@ int main(int argc, char** argv)
 
 		if (waitKey(5000) == 'k')
 			break;
-
 	}
 
 	return 0;

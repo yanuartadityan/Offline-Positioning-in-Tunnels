@@ -35,7 +35,7 @@ using namespace cv::xfeatures2d;
 VO::VO()											// WE HAVE TO TAKE DISTORTION INTO ACCOUNT!
 {																//							    Camera matrix
     cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));			//								___		  ___
-    imageScale = 1.0f;
+    imageScale = 1.5f;
 
 #ifndef KITTI_DATASET
 	cameraMatrix.at<double>(0, 0) = 1432.f/imageScale;						// Focal length X				| fx  0  cx |
@@ -426,11 +426,12 @@ void VO::drawPoints(cv::Mat img, std::vector<cv::Point2f>& points1, std::vector<
     vector <KeyPoint> keypoints2;
     cv::KeyPoint::convert(points2, keypoints2);
 
-    drawKeypoints(img, keypoints2, windowOutput, CV_RGB(255,0,0), 4);
+    drawKeypoints(img, keypoints2, windowOutput, CV_RGB(255,255,255), 4);
 
     for (int i=0; i<points1.size(); i++)
     {
-        cv::line(windowOutput, points1[i], points2[i], CV_RGB(243, 225, 63));
+        //cv::line(windowOutput, points1[i], points2[i], CV_RGB(243, 225, 63));
+        cv::line(windowOutput, points1[i], points2[i], CV_RGB(82, 192, 249));
     }
 
     imshow("VO grayscale", windowOutput);
@@ -445,7 +446,7 @@ void VO::initParameter()
 
     /* 0 - fast,  1 - sift, 2 - surf,    3 - lukaskanade
        4 - akaze, 5 - orb,  6 - fastsift */
-    vo_method = 0;
+    vo_method = 1;
 
     // fast
     fast_threshold = 20;
