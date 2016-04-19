@@ -1,4 +1,6 @@
-﻿#include <pcl/io/pcd_io.h>
+#include <vector>
+
+#include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/kdtree/kdtree_flann.h>
@@ -20,13 +22,13 @@ void PCLTest::foo()
 		cloud.points[i].z = 1024 * rand() / (RAND_MAX + 1.0f);
 	}
 	pcl::io::savePCDFileASCII("testpcd.pcd", cloud);
-	
+
 }
 
 std::vector<double> PCLTest::test(double x, double y, double z, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
 	//srand(time(NULL));
-	
+
 
 	/*
 	// Generate pointcloud data
@@ -41,9 +43,9 @@ std::vector<double> PCLTest::test(double x, double y, double z, pcl::PointCloud<
 		cloud->points[i].z = 1024.0f * rand() / (RAND_MAX + 1.0f);
 	}
 	*/
-	
+
 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-	
+
 	kdtree.setInputCloud(cloud);
 
 	pcl::PointXYZ searchPoint;
@@ -54,19 +56,17 @@ std::vector<double> PCLTest::test(double x, double y, double z, pcl::PointCloud<
 
 	searchPoint.x = x;
 	searchPoint.y = y;
-	searchPoint.z = z;	
+	searchPoint.z = z;
 
 	// K nearest neighbor search
 
 	int K = 1;
 
-	std::vector<double> bestPoint{0, 0, 0, 1000};
-
-
+	std::vector<double> bestPoint {0, 0, 0, 1000};
 
 	std::vector<int> pointIdxNKNSearch(K);
 	std::vector<float> pointNKNSquaredDistance(K);
-	
+
 	std::cout << "K nearest neighbor search at (" << searchPoint.x
 		<< " " << searchPoint.y
 		<< " " << searchPoint.z
@@ -80,7 +80,7 @@ std::vector<double> PCLTest::test(double x, double y, double z, pcl::PointCloud<
 						<< " " << cloud->points[pointIdxNKNSearch[i]].y
 						<< " " << cloud->points[pointIdxNKNSearch[i]].z
 						<< " (squared distance: " << pointNKNSquaredDistance[i] << ")" << std::endl;
-		
+
 			if (pointNKNSquaredDistance[i] < bestPoint[3])
 			{
 				bestPoint[0] = cloud->points[pointIdxNKNSearch[i]].x;
@@ -90,7 +90,7 @@ std::vector<double> PCLTest::test(double x, double y, double z, pcl::PointCloud<
 			}
 		}
 	}
-	
+
 
 	/*
 	// Neighbors within radius search
@@ -127,5 +127,5 @@ std::vector<double> PCLTest::test(double x, double y, double z, pcl::PointCloud<
 	*/
 	return bestPoint;
 
-	
+
 }
