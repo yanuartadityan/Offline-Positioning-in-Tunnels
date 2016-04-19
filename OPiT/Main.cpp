@@ -31,7 +31,6 @@
 using namespace std;
 using namespace cv;
 
-
 int main(int argc, char** argv)
 {
 	//Calibration moved to its own class.
@@ -39,7 +38,7 @@ int main(int argc, char** argv)
 	PnPSolver solver1, solver2;
 	VO vodometry;
     FeatureDetection fdetect;
-    
+
     Mat distCoeffs = calib.getDistortionCoeffs();
 
 #ifndef KITTI_DATASET
@@ -47,16 +46,16 @@ int main(int argc, char** argv)
 #else
     char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/kitti-odometry/dataset/sequences/00/image_0/";
 #endif
-    
+
     // CHECKING THE IMAGE QUALITY PER DIFFERENT FEATURE DETECTION
 //    fdetect.computeKeypointsAndDraw(pathname);
-    
+
     // VISUAL ODOMETRY
     //vodometry.initParameter();
     //vodometry.setImagePath(pathname);
     //vodometry.visualodometry();
 
-    
+
     // MANUAL CORRESPONDENCES PNP SOLVER
 	cout << "Starting first solver............." << endl << endl << endl;
 
@@ -113,27 +112,37 @@ int main(int argc, char** argv)
 		Multiply camera pose (T) with the homogeneous coordinates for each point, with Z-values from 0-n, to get the points of the ray.
 	*/
 	Mat T = solver1.getCameraPose().clone();
-	Mat p, p_;
+	Mat p, p_, p__, p___;
 	double newX, newY, newZ;
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 
 	int limit = 0;
 
-	for (int i = 1; i < 100; i++)
+	for (double i = 1; i < 50; i+=0.2)
 	{
-		p = (Mat_<double>(4, 1) << 397.210571, 145.146866, i, 1);
-		//p = (Mat_<double>(4, 1) << 0, 0, i, 1);
+		p = (Mat_<double>(4, 1) << (397.210571), (145.146866), i, 1);
+        p___ = (Mat_<double>(3,1) << i*397.210571, i*145.146866, i);
 
-		cout << "x = " << p.at<double>(0, 0) << endl
-			 << "y = " << p.at<double>(1, 0) << endl
-			 << "z = " << p.at<double>(2, 0) << endl << endl;
+        cout << T << endl;
+        cout << p << endl;
 
+        Mat K = calib.getCameraMatrix();
 
-		p_ = T * p;
+        p__ = K.inv() * p___;
 
-		newX = p_.at<double>(0, 0); newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
-		
+        cout << p__ << endl;
+
+        p_ = (Mat_<double>(4,1) << p__.at<double>(0,0), p__.at<double>(1,0), p__.at<double>(2,0), 1);
+
+        cout << p_ << endl;
+
+        p = T * p_;
+
+        cout << p << endl;
+
+		newX = p.at<double>(0, 0); newY = p.at<double>(1, 0); newZ = p.at<double>(2, 0);
+
 		vector<double> newPoint = PCLTest::test(newX, newY, newZ, cloud);
 
 		limit++;
@@ -145,15 +154,15 @@ int main(int argc, char** argv)
 		}
 
 		/*
-		cout << newX << "\t\t increased by: " << (newX - prevX) << endl << 
+		cout << newX << "\t\t increased by: " << (newX - prevX) << endl <<
 				newY << "\t increased by: " << (newY - prevY) << endl <<
 				newZ << "\t\t increased by: " << (newZ - prevZ) << endl <<
 				p_.at<double>(3, 0) << endl << endl;
 		*/
 		cout << "i = \t"    << i    << endl
-			 << "newX = \t" << newX << endl 
-			 << "newY = \t" << newY << endl 
-			 << "newZ = \t" << newZ << endl 
+			 << "newX = \t" << newX << endl
+			 << "newY = \t" << newY << endl
+			 << "newZ = \t" << newZ << endl
 			 << endl << endl;
 
 	}
@@ -171,7 +180,7 @@ int main(int argc, char** argv)
 	//		<< "increments in Y: \t " << (newY - prevY) << endl
 	//		<< "increments in Z: \t " << (newZ - prevZ) << endl
 	//		<< endl;
-	
+
 	//Mat p1_ = T * p1;
 	//Mat p2_ = T * p2;
 
