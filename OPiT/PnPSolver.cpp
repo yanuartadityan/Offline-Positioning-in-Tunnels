@@ -390,7 +390,7 @@ void PnPSolver::setVoVImagePoints()
 	imagepoints.push_back(Point2d(834.740051, 174.580566));
 	imagepoints.push_back(Point2d(211.190155, 510.402740));
 	imagepoints.push_back(Point2d(437.319458, 218.244186));
-	imagepoints.push_back(Point2d(845.259948, 160.41391));
+	imagepoints.push_back(Point2d(845.259948, 160.413910));
 	imagepoints.push_back(Point2d(559.729248, 170.678528));
 
 	vector<Point2d> imagepoints2;
