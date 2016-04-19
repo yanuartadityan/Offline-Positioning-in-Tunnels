@@ -20,7 +20,7 @@ using namespace std;
 
 	solvePnP defined here: http://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
 
-	solvePnP outputs the translation in the same unit as we specify world points in (currently the sweref 99?).
+	solvePnP outputs the translation in the same unit as we specify world points in (currently the sweref 99).
 
 
 	Some good stuff
@@ -117,15 +117,15 @@ int PnPSolver::foo(int verbalOutput)
 		tVec,						// Output translation vector
 		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 									//						of the rotation and translation vectors, respectively, and further optimizes them.
-		100,						// ITERATIONS COUNT, number of iterations
-		8,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
+		1000,						// ITERATIONS COUNT, number of iterations
+		10,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
 		0.99,						// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
 		CV_ITERATIVE);				// FLAGS, method for solving a PnP problem.
 
 
-									//Create the rotation matrix from the vector created above, by using the "Rodrigues"
+	//Create the rotation matrix from the vector created above, by using the "Rodrigues"
 	rMat.create(3, 3, DataType<double>::type);
 	Rodrigues(rVec, rMat);
 	//Create the translation matrix from the vector created above, by using the "Rodrigues"
@@ -181,6 +181,8 @@ int PnPSolver::foo(int verbalOutput)
 	p = Position in image coordinates (assume this is (0, 0, 1))
 	R = Rotation matrix    (R^t = R transposed)
 	t = translation vector
+								
+									      position = R.t * (K^-1 * (u, v, 1)) - t)
 
 	P = R^t (p-t)		Previously:	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
 
@@ -190,25 +192,26 @@ int PnPSolver::foo(int verbalOutput)
 	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 1);
 
 	//cameraPosition = -1 * rMat.t() * tVec;
-	cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
+	cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec); 
 
-
-
+	
 
 	/*
 		Taken from: https://en.wikipedia.org/wiki/Essential_matrix#3D_points_from_corresponding_image_points
-	*/
+	
 	Mat rMatRow1 = rMat.row(1), rMatRow3 = rMat.row(2);
 
 	Mat y = (Mat_<float>(1, 3) << VoVImagePoints[0][0].x, VoVImagePoints[0][0].y, 1.0f );
 	y.convertTo(y, CV_64FC1);
+	*/
+
 
 	/*
 		From: http://www.nature.com/nature/journal/v293/n5828/pdf/293133a0.pdf
 
 		SUPER WEIRD RESULTS
 			Guess some of the matrices are used incorrectly.
-	*/
+	
  	Mat Z1 = ( (rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * tVec);
 	//cout << "Z1 = " << Z1 << endl;
 	Mat Z2 = (Mat_<float>(1, 3)); Z2 = ((rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * y.t());
@@ -228,6 +231,8 @@ int PnPSolver::foo(int verbalOutput)
 	Mat ZZ = rMat * (Z - tVec);
 
 	cout << "Primed X Y Z = " << endl << XX << endl << endl << YY << endl << endl << ZZ << endl << endl;
+	*/
+
 
 	if(verbalOutput)
 	{
@@ -245,9 +250,9 @@ int PnPSolver::foo(int verbalOutput)
 
 		cout << "t =" << endl << tVec << endl << endl;
 
-		cout << "Camera pose: " << endl << cameraPose << endl << endl;
+		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
 
-		cout << "cPos = \t" << endl << cameraPosition << endl << endl;
+		cout << "Camera Position = \t" << endl << cameraPosition << endl << endl;
 
 
 		cout << endl << "***********************************************" << endl << endl;
