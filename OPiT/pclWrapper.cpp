@@ -1,7 +1,7 @@
 /* Visualize one or two points clouds
  Point clouds must be specified as input arguments : format file .pcd */
 
-#include <boost/thread/thread.hpp>
+
 #include "pcl/io/pcd_io.h"
 #include "pcl/visualization/pcl_visualizer.h"
 #include <pcl/console/parse.h>

@@ -12,33 +12,10 @@ class FeatureDetection
 {
 public:
     // constructor
-    FeatureDetection() : sift_matching_ratio(0.8f)
-    {
-        // fast
-        fast_threshold = 20;
-        nonMaxSuppression = true;
-
-        // surf
-        min_hessian = 200;
-        octave_layer = 3;
-        contrast_threshold = 0.04;
-        edge_threshold = 10;
-        sigma = 1.6;
-
-        // sift
-        sift_matching_ratio = 0.8;
-
-        //detector
-        fastdetect_ = cv::FastFeatureDetector::create(fast_threshold, nonMaxSuppression, cv::FastFeatureDetector::TYPE_9_16);
-        siftdetect_ = cv::xfeatures2d::SIFT::create(0, octave_layer, contrast_threshold, edge_threshold, sigma);
-        surfdetect_ = cv::xfeatures2d::SURF::create(min_hessian);
-
-        //extractor
-        siftextract_ = cv::xfeatures2d::SIFT::create(0, octave_layer, contrast_threshold, edge_threshold, sigma);
-        surfextract_ = cv::xfeatures2d::SURF::create(min_hessian);
-    }
-
+	FeatureDetection();
+	// destructor
     virtual ~FeatureDetection();
+	
 	static void foo();
 
     // the wrapper

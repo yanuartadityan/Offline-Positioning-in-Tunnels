@@ -5,11 +5,18 @@
 
 
 */
+//OPENCV
 #include <opencv2/features2d.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/opencv.hpp>
 
+//PCL
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+
+//OUR STUFF
 #include "Triangulation.h"
 #include "FeatureDetection.h"
 #include "Calibration.h"
@@ -45,9 +52,9 @@ int main(int argc, char** argv)
 //    fdetect.computeKeypointsAndDraw(pathname);
     
     // VISUAL ODOMETRY
-    vodometry.initParameter();
-    vodometry.setImagePath(pathname);
-    vodometry.visualodometry();
+    //vodometry.initParameter();
+    //vodometry.setImagePath(pathname);
+    //vodometry.visualodometry();
 
     
     // MANUAL CORRESPONDENCES PNP SOLVER
@@ -82,27 +89,102 @@ int main(int argc, char** argv)
 	cout << endl << endl << endl << endl << endl << endl;
 	cout << endl << endl << "camera 1 position: " << endl << solver1.getCameraPosition() << endl << "camera 2 position: " << endl << solver2.getCameraPosition() << endl;
 
-    
-    // IDK WHAT IS THIS
-	PCLTest::foo();
-	FeatureDetection::foo();
+    //
+    //// IDK WHAT IS THIS
+	//PCLTest::foo();
+	//FeatureDetection::foo();
+	//
+	//int counter = 0;
+	//
+	//string filename = "CADS4_OWG740_20140422_162231_005.avi";
+	//VideoCapture vc(filename);
+	//if (!vc.isOpened())
+	//	exit(EXIT_FAILURE);
+	//
+	//Mat frame1, frame2;
 
-	int counter = 0;
+	// Load the point cloud only once, as it is very slow
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::io::loadPCDFile("cloud.pcd", *cloud);
 
-	string filename = "CADS4_OWG740_20140422_162231_005.avi";
-	VideoCapture vc(filename);
-	if (!vc.isOpened())
-		exit(EXIT_FAILURE);
+	/*
+		Projection algorithm from: http://stackoverflow.com/questions/13957150/opencv-computing-camera-position-rotation
 
-	Mat frame1, frame2;
+		Multiply camera pose (T) with the homogeneous coordinates for each point, with Z-values from 0-n, to get the points of the ray.
+	*/
+	Mat T = solver1.getCameraPose().clone();
+	Mat p, p_;
+	double newX, newY, newZ;
 
+	vector<double> bestPoint{ 0, 0, 0, 1000 };
+
+	int limit = 0;
+
+	for (int i = 1; i < 100; i++)
+	{
+		p = (Mat_<double>(4, 1) << 397.210571, 145.146866, i, 1);
+		//p = (Mat_<double>(4, 1) << 0, 0, i, 1);
+
+		cout << "x = " << p.at<double>(0, 0) << endl
+			 << "y = " << p.at<double>(1, 0) << endl
+			 << "z = " << p.at<double>(2, 0) << endl << endl;
+
+
+		p_ = T * p;
+
+		newX = p_.at<double>(0, 0); newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
+		
+		vector<double> newPoint = PCLTest::test(newX, newY, newZ, cloud);
+
+		limit++;
+
+		if (newPoint[3] < bestPoint[3])
+		{
+			bestPoint = newPoint;
+			limit = 0;
+		}
+
+		/*
+		cout << newX << "\t\t increased by: " << (newX - prevX) << endl << 
+				newY << "\t increased by: " << (newY - prevY) << endl <<
+				newZ << "\t\t increased by: " << (newZ - prevZ) << endl <<
+				p_.at<double>(3, 0) << endl << endl;
+		*/
+		cout << "i = \t"    << i    << endl
+			 << "newX = \t" << newX << endl 
+			 << "newY = \t" << newY << endl 
+			 << "newZ = \t" << newZ << endl 
+			 << endl << endl;
+
+	}
+
+
+	cout << "*****************************";
+	cout << "The best point found:" << endl
+		<< "X = \t" << bestPoint[0] << endl
+		<< "Y = \t" << bestPoint[1] << endl
+		<< "Z = \t" << bestPoint[2] << endl
+		<< "DIST = \t" << bestPoint[3] << endl;
+	cout << "*****************************";
+
+	//cout	<< "increments in X: \t " << (newX - prevX) << endl
+	//		<< "increments in Y: \t " << (newY - prevY) << endl
+	//		<< "increments in Z: \t " << (newZ - prevZ) << endl
+	//		<< endl;
+	
+	//Mat p1_ = T * p1;
+	//Mat p2_ = T * p2;
+
+	//cout << "p1_ = " << endl << p1_ << endl << endl
+	//	<< "p2_ = " << endl << p2_ << endl << endl;
+	/*
+	// Skeleton code for iterating through the image sequence
 	while (vc.read(frame2))
 	{
 
 		// Change brightness
 		//frame2 = frame2 + Scalar(10,10,10);
 
-		//cout << "Iteration # " << counter << endl;
 
 		//resize(frame2, frame2, Size(frame2.cols / 2, frame2.rows / 2));
 
@@ -120,11 +202,12 @@ int main(int argc, char** argv)
 		//    These two will thus be continuously cycled.
 		frame1 = frame2.clone();
 
-
-
 		if (waitKey(5000) == 'k')
 			break;
 	}
+	*/
+
+
 
 	return 0;
 }

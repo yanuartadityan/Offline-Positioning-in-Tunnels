@@ -23,6 +23,48 @@ using namespace std;
 //Handy function for finding type of image
 string type2str(int type);
 
+FeatureDetection::FeatureDetection()
+{
+	// fast
+	fast_threshold = 20;
+	nonMaxSuppression = true;
+
+	// surf
+	min_hessian = 200;
+	octave_layer = 3;
+	contrast_threshold = 0.04;
+	edge_threshold = 10;
+	sigma = 1.6;
+
+	// sift
+	sift_matching_ratio = 0.8;
+
+	//detector
+	fastdetect_ = FastFeatureDetector::create(
+		10,			// int		threshold on difference between intensity of the central pixel and pixels of a circle around this pixel.
+		true,		// bool		nonmaxSuppression. If true, non-maximum suppression is applied to detected corners (keypoints).
+		2			// int		type, one of the three neighborhoods as defined in the paper:	FastFeatureDetector::TYPE_9_16, 
+					//																			FastFeatureDetector::TYPE_7_12, 
+					//																			FastFeatureDetector::TYPE_5_8
+		);
+
+	siftdetect_ = cv::xfeatures2d::SIFT::create(0, octave_layer, contrast_threshold, edge_threshold, sigma);
+
+
+	surfdetect_ = xfeatures2d::SURF::create(
+		100,	// double	hessianThreshold	for hessian keypoint detector used in SURF
+		4,		// int		nOctaves			number of pyramid octaves the keypoint detector will use
+		3,		// int		nOctaveLayers		number of octave layers within each octave	
+		false,	// bool		extended			extended descriptor flag (true - use extended 128-element descriptors; false - use 64-element descriptors)
+		false	// bool		upright				up-right or rotated features flag (true - do not compute orientation of features; false - compute orientation)
+		);
+
+	//extractor
+	siftextract_ = cv::xfeatures2d::SIFT::create(0, octave_layer, contrast_threshold, edge_threshold, sigma);
+	surfextract_ = cv::xfeatures2d::SURF::create(min_hessian);
+}
+
+
 // destructor
 FeatureDetection::~FeatureDetection()
 {
