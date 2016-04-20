@@ -102,7 +102,7 @@ int pclWrapper (int argc, char** argv)
             single_view = false;
 
             // Read the second file .pcd
-            std::string filename = argv[pcd_filename_indices[1]];
+            filename = argv[pcd_filename_indices[1]];
             if (pcl::io::loadPCDFile (filename, *point_cloud2_ptr) == -1) {
                 std::cout << "Was not able to open file \""<<filename<<"\".\n";
                 printUsage (argv[0]);

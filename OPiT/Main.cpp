@@ -1,7 +1,7 @@
 /*
-	AUTHOR: DAVID BENNEHAG
+	AUTHOR: DAVID BENNEHAG and YANUAR T. A. NUGRAHA
 
-	Requires OpenCV (tested on 3.1)
+	Requires OpenCV (tested on 3.1) AND PCL
 
 
 */
@@ -27,6 +27,7 @@
 #include "PCLTest.h"
 
 #include <iostream>
+#include <string>
 
 using namespace std;
 using namespace cv;
@@ -34,6 +35,8 @@ using namespace cv;
 
 int main(int argc, char** argv)
 {
+	const float THRESHOLD = 0.01f;
+
 	//Calibration moved to its own class.
     Calibration calib;
 	PnPSolver solver1, solver2;
@@ -86,7 +89,6 @@ int main(int argc, char** argv)
 	solver2.setImagePoints(imageTwo);
 	solver2.foo(1);
 
-	cout << endl << endl << endl << endl << endl << endl;
 	cout << endl << endl << "camera 1 position: " << endl << solver1.getCameraPosition() << endl << "camera 2 position: " << endl << solver2.getCameraPosition() << endl;
 
     //
@@ -103,80 +105,108 @@ int main(int argc, char** argv)
 	//
 	//Mat frame1, frame2;
 
+	cout << endl << "Loading point cloud... ";
 	// Load the point cloud only once, as it is very slow
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::io::loadPCDFile("cloud.pcd", *cloud);
+	cout << "Done!" << endl << endl;
 
 	/*
 		Projection algorithm from: http://stackoverflow.com/questions/13957150/opencv-computing-camera-position-rotation
 
-		Multiply camera pose (T) with the homogeneous coordinates for each point, with Z-values from 0-n, to get the points of the ray.
+		Projection details: http://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/node3.html
+
+		v' is camera space coordinate, v is world space coordinate
+		v = R^T * v' - R^T * t
+
+		x = K * [R|t] * X
+
 	*/
 	Mat T = solver1.getCameraPose().clone();
-	Mat p, p_;
+	Mat K = calib.getCameraMatrix();
+
+	Mat p, p_, p3d;
 	double newX, newY, newZ;
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 
-	int limit = 0;
-
-	for (int i = 1; i < 100; i++)
-	{
-		p = (Mat_<double>(4, 1) << 397.210571, 145.146866, i, 1);
-		//p = (Mat_<double>(4, 1) << 0, 0, i, 1);
-
-		cout << "x = " << p.at<double>(0, 0) << endl
-			 << "y = " << p.at<double>(1, 0) << endl
-			 << "z = " << p.at<double>(2, 0) << endl << endl;
-
-
-		p_ = T * p;
-
-		newX = p_.at<double>(0, 0); newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
-		
-		vector<double> newPoint = PCLTest::test(newX, newY, newZ, cloud);
-
-		limit++;
-
-		if (newPoint[3] < bestPoint[3])
+	vector<Point2d> imagepoints = solver1.getVoVImagePoints()[0];
+	
+	for(Point2d point : imagepoints)
+	{ 
+		for (double i = 20; i < 30; i+=.1)
 		{
-			bestPoint = newPoint;
-			limit = 0;
+			/*
+			*	Take the image coordinates (X and Y) of the feature point, 
+			*		together with i which represents going "one step further" on the ray.
+			*/ 
+			p = (Mat_<double>(3, 1) << i*point.x, i*point.y, i);
+
+		
+			/*
+			*	We use the inverse camera matrix (K) to bring the image coordinate from the
+			*		Image coordinate system
+			*	to
+			*		Camera coordinate system
+			*
+			*		
+			*/
+			p = K.inv() * p;
+
+
+			/*
+			*	To represent a 3D point in the world coordinate system as a homogeneous point,
+			*		we need a 4x1 vector, containing the X, Y, Z and a 1.
+			*/
+			p3d = (Mat_<double>(4, 1) << p.at<double>(0,0), p.at<double>(1, 0), p.at<double>(2, 0), 1);
+
+
+			/*
+			*	We use our 4x4 transformation matrix (T), which is equal to our camera pose matrix, 
+			*		to bring the point from the
+			*			Camera coordinate system
+			*		to
+			*			World coordinate system
+			*
+			*	If we have a point in camera coordinates, we can transform it to world coordinates.
+			*		p' = T * (x, y, z, 1)^T
+			*/
+			p_ = T * p3d;
+
+
+			/*
+			*	We use the calculated point inside the world coordinate system as the search point
+			*		for finding the closest neighbour (point) in the point cloud.
+			*/
+			newX = p_.at<double>(0, 0);	newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
+			vector<double> newPoint = PCLTest::test(newX, newY, newZ, cloud);
+
+			/*
+			*	We want to save the neighbour only if it's better than our previously best.
+			*
+			*/
+			if (newPoint[3] < THRESHOLD)
+			{
+				bestPoint = newPoint;
+
+				break;
+			}
 		}
 
-		/*
-		cout << newX << "\t\t increased by: " << (newX - prevX) << endl << 
-				newY << "\t increased by: " << (newY - prevY) << endl <<
-				newZ << "\t\t increased by: " << (newZ - prevZ) << endl <<
-				p_.at<double>(3, 0) << endl << endl;
-		*/
-		cout << "i = \t"    << i    << endl
-			 << "newX = \t" << newX << endl 
-			 << "newY = \t" << newY << endl 
-			 << "newZ = \t" << newZ << endl 
-			 << endl << endl;
-
+		cout << setprecision(15);
+		cout << "*****************************" << endl;
+		cout << "Seaching for image point\t" << point << endl << endl;
+		cout << "The best point found:" << endl
+			<< "X = \t"		<< bestPoint[0] << endl
+			<< "Y = \t"		<< bestPoint[1] << endl
+			<< "Z = \t"		<< bestPoint[2] << endl
+			<< "DIST = \t"	<< bestPoint[3] << endl;
+		cout << "*****************************\n\n\n\n\n";
 	}
-
-
-	cout << "*****************************";
-	cout << "The best point found:" << endl
-		<< "X = \t" << bestPoint[0] << endl
-		<< "Y = \t" << bestPoint[1] << endl
-		<< "Z = \t" << bestPoint[2] << endl
-		<< "DIST = \t" << bestPoint[3] << endl;
-	cout << "*****************************";
-
-	//cout	<< "increments in X: \t " << (newX - prevX) << endl
-	//		<< "increments in Y: \t " << (newY - prevY) << endl
-	//		<< "increments in Z: \t " << (newZ - prevZ) << endl
-	//		<< endl;
 	
-	//Mat p1_ = T * p1;
-	//Mat p2_ = T * p2;
-
-	//cout << "p1_ = " << endl << p1_ << endl << endl
-	//	<< "p2_ = " << endl << p2_ << endl << endl;
+	
+	
+	
 	/*
 	// Skeleton code for iterating through the image sequence
 	while (vc.read(frame2))
