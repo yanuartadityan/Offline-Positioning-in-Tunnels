@@ -48,7 +48,7 @@ int main(int argc, char** argv)
 #endif
 
     // CHECKING THE IMAGE QUALITY PER DIFFERENT FEATURE DETECTION
-//    fdetect.computeKeypointsAndDraw(pathname);
+    fdetect.computeKeypointsAndDraw(pathname);
 
     // VISUAL ODOMETRY
     //vodometry.initParameter();
@@ -118,8 +118,10 @@ int main(int argc, char** argv)
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 
 	int limit = 0;
+    int counter = 0;
+    int counterIdx;
 
-	for (double i = 1; i < 50; i+=0.2)
+	for (double i = 20; i < 40; i+=0.4)
 	{
 		p = (Mat_<double>(4, 1) << (397.210571), (145.146866), i, 1);
         p___ = (Mat_<double>(3,1) << i*397.210571, i*145.146866, i);
@@ -151,6 +153,7 @@ int main(int argc, char** argv)
 		{
 			bestPoint = newPoint;
 			limit = 0;
+            counterIdx = counter;
 		}
 
 		/*
@@ -165,16 +168,17 @@ int main(int argc, char** argv)
 			 << "newZ = \t" << newZ << endl
 			 << endl << endl;
 
+       counter++;
 	}
 
 
-	cout << "*****************************";
-	cout << "The best point found:" << endl
+	cout << "*****************************\n";
+	cout << "The best point found after "<< counter << " iteration in " << counterIdx << "th:\n"
 		<< "X = \t" << bestPoint[0] << endl
 		<< "Y = \t" << bestPoint[1] << endl
 		<< "Z = \t" << bestPoint[2] << endl
 		<< "DIST = \t" << bestPoint[3] << endl;
-	cout << "*****************************";
+	cout << "*****************************\n";
 
 	//cout	<< "increments in X: \t " << (newX - prevX) << endl
 	//		<< "increments in Y: \t " << (newY - prevY) << endl

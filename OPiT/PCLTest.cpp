@@ -67,7 +67,7 @@ std::vector<double> PCLTest::test(double x, double y, double z, pcl::PointCloud<
 	std::vector<int> pointIdxNKNSearch(K);
 	std::vector<float> pointNKNSquaredDistance(K);
 
-	std::cout << "K nearest neighbor search at (" << searchPoint.x
+	std::cout << "K nearest neighbor search at: \n(" << searchPoint.x
 		<< " " << searchPoint.y
 		<< " " << searchPoint.z
 		<< ") with K=" << K << std::endl;
@@ -76,7 +76,7 @@ std::vector<double> PCLTest::test(double x, double y, double z, pcl::PointCloud<
 	{
 		for (size_t i = 0; i < pointIdxNKNSearch.size(); ++i)
 		{
-			std::cout	<< "    " << cloud->points[pointIdxNKNSearch[i]].x
+			std::cout	<< " " << cloud->points[pointIdxNKNSearch[i]].x
 						<< " " << cloud->points[pointIdxNKNSearch[i]].y
 						<< " " << cloud->points[pointIdxNKNSearch[i]].z
 						<< " (squared distance: " << pointNKNSquaredDistance[i] << ")" << std::endl;
