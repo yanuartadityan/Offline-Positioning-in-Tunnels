@@ -1,2 +1,0 @@
-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ar qc libsrc.a  CMakeFiles/src.dir/Calibration.cpp.o CMakeFiles/src.dir/Converter.cpp.o CMakeFiles/src.dir/FeatureDetection.cpp.o CMakeFiles/src.dir/PCLTest.cpp.o CMakeFiles/src.dir/pclWrapper.cpp.o CMakeFiles/src.dir/PnPSolver.cpp.o CMakeFiles/src.dir/PointProjection.cpp.o CMakeFiles/src.dir/Reprojection.cpp.o CMakeFiles/src.dir/Triangulation.cpp.o CMakeFiles/src.dir/VisualOdometry.cpp.o
-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ranlib libsrc.a
