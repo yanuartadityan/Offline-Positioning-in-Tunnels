@@ -24,7 +24,7 @@
 #include "PointProjection.h"
 #include "Converter.h"
 #include "VisualOdometry.h"
-#include "PCLTest.h"
+#include "PCLCloudSearch.h"
 
 #include <iostream>
 #include <string>
@@ -179,7 +179,7 @@ int main(int argc, char** argv)
 			*		for finding the closest neighbour (point) in the point cloud.
 			*/
 			newX = p_.at<double>(0, 0);	newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
-			vector<double> newPoint = PCLTest::test(newX, newY, newZ, cloud);
+			vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud);
 
 			/*
 			*	We want to save the neighbour only if it's better than our previously best.
