@@ -48,13 +48,12 @@ int main(int argc, char** argv)
 #endif
 
     // CHECKING THE IMAGE QUALITY PER DIFFERENT FEATURE DETECTION
-    fdetect.computeKeypointsAndDraw(pathname);
+    // fdetect.computeKeypointsAndDraw(pathname);
 
     // VISUAL ODOMETRY
     //vodometry.initParameter();
     //vodometry.setImagePath(pathname);
     //vodometry.visualodometry();
-
 
     // MANUAL CORRESPONDENCES PNP SOLVER
 	cout << "Starting first solver............." << endl << endl << endl;
@@ -117,68 +116,64 @@ int main(int argc, char** argv)
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 
-	int limit = 0;
-    int counter = 0;
-    int counterIdx;
+    // reproject 2D to 3D
+    Mat K = calib.getCameraMatrix();
+    for (int pidx=0; pidx<10; pidx++)
+    {
+        int limit = 0;
+        int counter = 0;
+        int counterIdx = 0;
 
-	for (double i = 20; i < 40; i+=0.4)
-	{
-		p = (Mat_<double>(4, 1) << (397.210571), (145.146866), i, 1);
-        p___ = (Mat_<double>(3,1) << i*397.210571, i*145.146866, i);
+        // get the current pixels
+        cout << imageOne[pidx] << endl;
 
-        cout << T << endl;
-        cout << p << endl;
+    	for (double i = 20; i < 40; i+=0.4)
+    	{
+            // build a line originating from camera center (0,0,0) to the pixels
+            p___ = (Mat_<double>(3,1) << i*(imageOne[pidx].x), i*(imageOne[pidx].y), i);
 
-        Mat K = calib.getCameraMatrix();
+            p__ = K.inv() * p___;
 
-        p__ = K.inv() * p___;
+            p_ = (Mat_<double>(4,1) << p__.at<double>(0,0), p__.at<double>(1,0), p__.at<double>(2,0), 1);
 
-        cout << p__ << endl;
+            p = T * p_;
 
-        p_ = (Mat_<double>(4,1) << p__.at<double>(0,0), p__.at<double>(1,0), p__.at<double>(2,0), 1);
+    		newX = p.at<double>(0, 0); newY = p.at<double>(1, 0); newZ = p.at<double>(2, 0);
 
-        cout << p_ << endl;
+    		vector<double> newPoint = PCLTest::test(newX, newY, newZ, cloud);
 
-        p = T * p_;
+    		limit++;
 
-        cout << p << endl;
+//    		if (newPoint[3] < bestPoint[3])
+            if (newPoint[3] < 0.01f)
+    		{
+    			bestPoint = newPoint;
+    			limit = 0;
+                counterIdx = counter;
+                break;
+    		}
 
-		newX = p.at<double>(0, 0); newY = p.at<double>(1, 0); newZ = p.at<double>(2, 0);
+    		// cout << "i = \t"    << i    << endl
+    		// 	 << "newX = \t" << newX << endl
+    		// 	 << "newY = \t" << newY << endl
+    		// 	 << "newZ = \t" << newZ << endl
+    		// 	 << endl << endl;
 
-		vector<double> newPoint = PCLTest::test(newX, newY, newZ, cloud);
+           counter++;
+    	}
 
-		limit++;
+        cout.setf(ios::fixed);
+    	cout << "*****************************\n";
+    	cout << "The best point found after "<< counter << " iteration in " << counterIdx << "th:\n"
+    		<< "X = \t" << std::setprecision(5) << bestPoint[0] << endl
+    		<< "Y = \t" << std::setprecision(5) << bestPoint[1] << endl
+    		<< "Z = \t" << std::setprecision(5) << bestPoint[2] << endl
+    		<< "DIST = \t" << bestPoint[3] << endl;
+    	cout << "*****************************\n";
 
-		if (newPoint[3] < bestPoint[3])
-		{
-			bestPoint = newPoint;
-			limit = 0;
-            counterIdx = counter;
-		}
-
-		/*
-		cout << newX << "\t\t increased by: " << (newX - prevX) << endl <<
-				newY << "\t increased by: " << (newY - prevY) << endl <<
-				newZ << "\t\t increased by: " << (newZ - prevZ) << endl <<
-				p_.at<double>(3, 0) << endl << endl;
-		*/
-		cout << "i = \t"    << i    << endl
-			 << "newX = \t" << newX << endl
-			 << "newY = \t" << newY << endl
-			 << "newZ = \t" << newZ << endl
-			 << endl << endl;
-
-       counter++;
-	}
-
-
-	cout << "*****************************\n";
-	cout << "The best point found after "<< counter << " iteration in " << counterIdx << "th:\n"
-		<< "X = \t" << bestPoint[0] << endl
-		<< "Y = \t" << bestPoint[1] << endl
-		<< "Z = \t" << bestPoint[2] << endl
-		<< "DIST = \t" << bestPoint[3] << endl;
-	cout << "*****************************\n";
+        // reset
+        bestPoint = {0, 0, 0, 1000};
+    }
 
 	//cout	<< "increments in X: \t " << (newX - prevX) << endl
 	//		<< "increments in Y: \t " << (newY - prevY) << endl
