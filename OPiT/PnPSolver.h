@@ -30,6 +30,7 @@ public:
 	cv::Mat getFundamentalMatrix();
 
 	void setVoVImagePoints();
+	std::vector< std::vector<cv::Point2d> > getVoVImagePoints();
 
 	
 	

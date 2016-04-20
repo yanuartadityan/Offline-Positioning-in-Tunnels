@@ -212,3 +212,11 @@ _Pvt_Extensions/
 ModelManifest.xml
 
 *.VC.opendb
+/OPiT.sln
+/OPiT.VC.db
+/OPiT/CADS4_OWG740_20140422_162231_004.avi
+/OPiT/CADS4_OWG740_20140422_162231_005.avi
+/OPiT/cloud.pcd
+/OPiT/OPiT.vcxproj
+/OPiT/OPiT.vcxproj.filters
+/OPiT/testpcd.pcd
