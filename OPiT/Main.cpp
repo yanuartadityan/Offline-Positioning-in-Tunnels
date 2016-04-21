@@ -163,9 +163,6 @@ int main(int argc, char** argv)
 	*/
 	for(int counter = 0; counter < imagepoints.size(); counter++)
 	{ 
-		thread t([bestPoint, T, K, imagepoints, counter, cloud, descriptors1, _3dToDescriptorVector]
-		{
-
 		
 		bestPoint = Reprojection::backproject(T, K, imagepoints[counter], cloud);
 
@@ -200,7 +197,7 @@ int main(int argc, char** argv)
 
 		// Push the pair into the lookup table
 		_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
-		});
+		
 	}
 	
 
