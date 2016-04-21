@@ -107,6 +107,8 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 *
 *	Projection details: http://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/node3.html
 *
+*	Algebraic solution: https://www.siggraph.org/education/materials/HyperGraph/raytrace/rtinter1.htm
+*
 *	v' is camera space coordinate, v is world space coordinate
 *	v = R^T * v' - R^T * t
 *
@@ -115,13 +117,16 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
-	const float THRESHOLD = 0.01f;
+	const double THRESHOLD = 0.01;
+	const double MIN_DIST = 20.0;
+	const double MAX_DIST = 30.0;
+	const double DELTA_Z = 0.05;
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 	Mat p, p_, p3d;
 	double newX, newY, newZ;
 
-	for (double i = 20; i < 30; i += .1)
+	for (double i = MIN_DIST; i < MAX_DIST; i += DELTA_Z)
 	{
 		/*
 		*	Take the image coordinates (X and Y) of the feature point,
@@ -169,13 +174,13 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud);
 
 		/*
-		*	We want to save the neighbour only if it's better than our previously best.
-		*
+		*	As soon as we find a "good enough" point, return it, 
+		*		since we don't want to risk going too deep into the cloud.
 		*/
 		if (newPoint[3] < THRESHOLD)
 		{
 			bestPoint = newPoint;
-
+			cout << i << endl;
 			break;
 		}
 	}

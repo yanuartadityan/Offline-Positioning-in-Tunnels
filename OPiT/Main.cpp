@@ -27,6 +27,7 @@
 //C++ STUFF
 #include <iostream>
 #include <string>
+#include <thread>
 
 
 using namespace std;
@@ -62,7 +63,7 @@ int main(int argc, char** argv)
 
     
     // MANUAL CORRESPONDENCES PNP SOLVER
-	cout << "Starting first solver............." << endl << endl << endl;
+	cout << "Running first solver... ";
 
 	vector<Point2d> imageOne;
 	imageOne.push_back(Point2d(397.210571, 145.146866));	imageOne.push_back(Point2d(650.494934, 129.172379));
@@ -73,12 +74,9 @@ int main(int argc, char** argv)
 
 	solver1.setImagePoints(imageOne);
 	solver1.foo(0);
-
-	cout << endl << endl << endl << endl << endl << endl;
-	cout << "Starting second solver............." << endl << endl << endl;
-
-	// Take another image showing the same scene.
-	//  So the 2D image points will be different of course...
+	cout << "Done!" << endl << endl;
+	
+	cout << "Running second solver... ";
 
 	vector<Point2d> imageTwo;
 	imageTwo.push_back(Point2d(490, 250));	imageTwo.push_back(Point2d(668, 242));
@@ -89,56 +87,17 @@ int main(int argc, char** argv)
 
 	solver2.setImagePoints(imageTwo);
 	solver2.foo(0);
+	cout << "Done!" << endl;
 
-	cout << endl << endl << "camera 1 position: " << endl << solver1.getCameraPosition() << endl << "camera 2 position: " << endl << solver2.getCameraPosition() << endl;
+	//cout << endl << endl << "camera 1 position: " << endl << solver1.getCameraPosition() << endl << "camera 2 position: " << endl << solver2.getCameraPosition() << endl;
 
-    //
-    //// IDK WHAT IS THIS
-	//PCLTest::foo();
-	//FeatureDetection::foo();
-	//
-	//int counter = 0;
-	//
-	//string filename = "CADS4_OWG740_20140422_162231_005.avi";
-	//VideoCapture vc(filename);
-	//if (!vc.isOpened())
-	//	exit(EXIT_FAILURE);
-	//
-	
 	Mat frame1 = imread("img_00433.png");
-	//Mat frame2 = imread("img_00433.png");
-
-	cvtColor(frame1, frame1, COLOR_BGR2GRAY);
-	//cvtColor(frame2, frame2, COLOR_BGR2GRAY);
-
+	
 	vector<KeyPoint> keypoints1;
-	//vector<KeyPoint> keypoints2;
+	fdetect.surfDetector(frame1,keypoints1);
+
 	Mat descriptors1;
-
-	Ptr<Feature2D> sift = xfeatures2d::SIFT::create(
-		0,			// int 		nfeatures
-		3,			// int 		nOctaveLayers
-		0.04,		// double 	contrastThreshold
-		10,			// double 	edgeThreshold
-		1.6			// double 	sigma
-	);
-
-	Ptr<FeatureDetector> surf = xfeatures2d::SURF::create(
-		100,	// double	hessianThreshold	for hessian keypoint detector used in SURF
-		4,		// int		nOctaves			number of pyramid octaves the keypoint detector will use
-		3,		// int		nOctaveLayers		number of octave layers within each octave	
-		false,	// bool		extended			extended descriptor flag (true - use extended 128-element descriptors; false - use 64-element descriptors)
-		false	// bool		upright				up-right or rotated features flag (true - do not compute orientation of features; false - compute orientation)
-	);
-
-	// Detect SURF keypoints in the image
-	surf->detect(frame1, keypoints1);
-	
-	// Compute the 128 dimension SIFT descriptor at each keypoint.
-	sift->compute(frame1, keypoints1, descriptors1);
-	
-	
-	
+	fdetect.siftExtraction(frame1, keypoints1,descriptors1);
 	
 	
 	/*
@@ -195,8 +154,6 @@ int main(int argc, char** argv)
 	Mat T = solver1.getCameraPose().clone();
 	Mat K = calib.getCameraMatrix();
 
-	
-
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 
 	vector<Point2d> imagepoints = solver1.getVoVImagePoints()[0];
@@ -206,22 +163,21 @@ int main(int argc, char** argv)
 	*/
 	for(int counter = 0; counter < imagepoints.size(); counter++)
 	{ 
+		thread t([bestPoint, T, K, imagepoints, counter, cloud, descriptors1, _3dToDescriptorVector]
+		{
+
 		
 		bestPoint = Reprojection::backproject(T, K, imagepoints[counter], cloud);
-		
-
 
 		cout << setprecision(15);
 		cout << "*****************************" << endl;
 		cout << "Seaching for image point\t" << imagepoints[counter] << endl << endl;
-		cout << "The best point found:" << endl
-			<< "X = \t"		<< bestPoint[0] << endl
-			<< "Y = \t"		<< bestPoint[1] << endl
-			<< "Z = \t"		<< bestPoint[2] << endl
-			<< "DIST = \t"	<< bestPoint[3] << endl;
+		cout << "The best point found:"		 << endl
+			<< "X = \t"		<< bestPoint[0]  << endl
+			<< "Y = \t"		<< bestPoint[1]  << endl
+			<< "Z = \t"		<< bestPoint[2]  << endl
+			<< "DIST = \t"	<< bestPoint[3]  << endl;
 		cout << "*****************************\n\n\n\n\n";
-
-
 
 		/*
 		*	Update the Look Up Table for what descriptor belongs to which image point
@@ -244,7 +200,7 @@ int main(int argc, char** argv)
 
 		// Push the pair into the lookup table
 		_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
-
+		});
 	}
 	
 
