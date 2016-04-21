@@ -4,3 +4,5 @@
 /build3/
 /buildunix/
 /buildxcode/
+MainWrapper.cpp
+MainWrapper.h

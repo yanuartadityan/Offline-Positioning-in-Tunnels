@@ -406,11 +406,4 @@ void PnPSolver::setVoVImagePoints()
 
 	PnPSolver::VoVImagePoints.push_back(imagepoints);
 	PnPSolver::VoVImagePoints.push_back(imagepoints2);
-
-
-}
-
-vector< vector<Point2d> > PnPSolver::getVoVImagePoints()
-{
-	return PnPSolver::VoVImagePoints;
 }
