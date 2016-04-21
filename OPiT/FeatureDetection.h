@@ -15,12 +15,10 @@ public:
 	FeatureDetection();
 	// destructor
     virtual ~FeatureDetection();
-	
-	static void foo();
 
     // the wrapper
     void computeKeypointsAndDraw(char *pathname);
-    
+
     // methods for feature detections, SIFT, FAST and SURF
     void fastDetector(cv::Mat img, std::vector<cv::KeyPoint>& detectedPoints);
     void siftDetector(cv::Mat img, std::vector<cv::KeyPoint>& detectedPoints);
@@ -30,9 +28,15 @@ public:
     void siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor);
     void surfExtraction (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor);
 
+	// methods for matching descriptors
+    void bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<cv::DMatch> > &matches);
+
     // draw keypoints
     void drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output);
     
+    // return some val
+    float getSiftMatchingRatio ();
+
 private:
     // pointer to the feature point detector object
     cv::Ptr<cv::FeatureDetector> siftdetect_;
@@ -44,7 +48,7 @@ private:
     cv::Ptr<cv::DescriptorExtractor> surfextract_;
 
     // pointer to the matcher object
-    cv::Ptr<cv::DescriptorMatcher> matcher;
+    cv::Ptr<cv::DescriptorMatcher> matcher_;
 
     // fast param
     int fast_threshold;
