@@ -343,10 +343,11 @@ cv::Mat PnPSolver::getCameraPosition()
 	return PnPSolver::cameraPosition;
 }
 
-cv::Mat PnPSolver::getEssentialMatrix(Mat CM)
+cv::Mat PnPSolver::getEssentialMatrix()
 {
+	Calibration calib;
 	Mat mask;
-	Mat cameraMatrix = CM.clone();
+	Mat cameraMatrix = calib.getCameraMatrix();
 	/*
 	findEssentialMat() declared in: https://github.com/Itseez/opencv/blob/master/modules/calib3d/src/five-point.cpp
 	*/
