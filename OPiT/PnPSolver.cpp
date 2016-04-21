@@ -48,46 +48,24 @@ int PnPSolver::foo(int verbalOutput)
 
 	Calibration calib;
 
-
-	Mat mask;
 	Mat cameraMatrix = calib.getCameraMatrix();
-	/*
-	findEssentialMat() declared in: https://github.com/Itseez/opencv/blob/master/modules/calib3d/src/five-point.cpp
-	*/
-	essentialMatrix = findEssentialMat(
-		VoVImagePoints[0],					// Array of N (N >= 5) 2D points from the first image.The point coordinates should be floating - point(single or double precision).
-		VoVImagePoints[1],					// Array of the second image points of the same size and format as points1 .
-		cameraMatrix,
-		RANSAC,								// Method for computing a fundamental matrix.
-
-		0.99,								// Parameter used for the RANSAC. It specifies a desirable level of confidence (probability) that the estimated matrix is correct.
-
-		3,									// RANSAC threshold, the maximum distance from a point to an epipolar line in pixels,
-											//  beyond which the point is considered an outlier and is not used for computing the final fundamental matrix.
-											//   It can be set to something like 1 - 3, depending on the accuracy of the point localization, image resolution, and the image noise.
-
-		mask								// Output array of N elements, every element of which is set to 0 for outliers and to 1 for the other points.The array is computed only in the RANSAC and LMedS methods.
-		);
-
-	fundamentalMatrix = findFundamentalMat(
-		VoVImagePoints[0],					// Take the first vector of points (the first image)
-		VoVImagePoints[1],					// ...And the second
-		CV_FM_RANSAC						// Use RANSAC
-		);
-
+	
+	
+	
+	
 	/*
 	recoverPose() described here: http://docs.opencv.org/3.0-beta/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#recoverpose
 	*/
-	recoverPose(
-		essentialMatrix,
-		VoVImagePoints[0],
-		VoVImagePoints[1],
-		R,
-		t,
-		cameraMatrix.at<double>(0, 0),
-		Point2d(cameraMatrix.at<double>(0, 2), cameraMatrix.at<double>(1, 2)),
-		mask
-		);
+	//recoverPose(
+	//	essentialMatrix,
+	//	VoVImagePoints[0],
+	//	VoVImagePoints[1],
+	//	R,
+	//	t,
+	//	cameraMatrix.at<double>(0, 0),
+	//	Point2d(cameraMatrix.at<double>(0, 2), cameraMatrix.at<double>(1, 2)),
+	//	mask
+	//	);
 
 
 
@@ -365,13 +343,39 @@ cv::Mat PnPSolver::getCameraPosition()
 	return PnPSolver::cameraPosition;
 }
 
-cv::Mat PnPSolver::getEssentialMatrix()
+cv::Mat PnPSolver::getEssentialMatrix(Mat CM)
 {
+	Mat mask;
+	Mat cameraMatrix = CM.clone();
+	/*
+	findEssentialMat() declared in: https://github.com/Itseez/opencv/blob/master/modules/calib3d/src/five-point.cpp
+	*/
+	PnPSolver::essentialMatrix = findEssentialMat(
+		VoVImagePoints[0],					// Array of N (N >= 5) 2D points from the first image.The point coordinates should be floating - point(single or double precision).
+		VoVImagePoints[1],					// Array of the second image points of the same size and format as points1 .
+		cameraMatrix,
+		RANSAC,								// Method for computing a fundamental matrix.
+
+		0.99,								// Parameter used for the RANSAC. It specifies a desirable level of confidence (probability) that the estimated matrix is correct.
+
+		3,									// RANSAC threshold, the maximum distance from a point to an epipolar line in pixels,
+											//  beyond which the point is considered an outlier and is not used for computing the final fundamental matrix.
+											//   It can be set to something like 1 - 3, depending on the accuracy of the point localization, image resolution, and the image noise.
+
+		mask								// Output array of N elements, every element of which is set to 0 for outliers and to 1 for the other points.The array is computed only in the RANSAC and LMedS methods.
+	);
+
 	return PnPSolver::essentialMatrix;
 }
 
 cv::Mat PnPSolver::getFundamentalMatrix()
 {
+	PnPSolver::fundamentalMatrix = findFundamentalMat(
+		VoVImagePoints[0],					// Take the first vector of points (the first image)
+		VoVImagePoints[1],					// ...And the second
+		CV_FM_RANSAC						// Use RANSAC
+	);
+
 	return PnPSolver::fundamentalMatrix;
 }
 

@@ -26,7 +26,7 @@ public:
 	cv::Mat getRotationMatrix();
 	cv::Mat getTranslationMatrix();
 
-	cv::Mat getEssentialMatrix();
+	cv::Mat getEssentialMatrix(cv::Mat CM);
 	cv::Mat getFundamentalMatrix();
 
 	void setVoVImagePoints();

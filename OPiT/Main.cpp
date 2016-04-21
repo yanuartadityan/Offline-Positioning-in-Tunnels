@@ -159,7 +159,7 @@ int main(int argc, char** argv)
 	vector<Point2d> imagepoints = solver1.getVoVImagePoints()[0];
 	
 	/*
-		For every feature point that we find in our image, we do the backprojection.
+	*	For every feature point that we find in our image, we do the backprojection.
 	*/
 	for(int counter = 0; counter < imagepoints.size(); counter++)
 	{ 
