@@ -258,8 +258,6 @@ int PnPSolver::foo(int verbalOutput)
 		cout << endl << "***********************************************" << endl << endl;
 	}
 
-
-
 	return 0;
 }
 
