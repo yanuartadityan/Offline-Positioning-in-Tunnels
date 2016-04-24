@@ -8,3 +8,4 @@ MainWrapper.cpp
 MainWrapper.h
 pclWrapper.h
 pclWrapper.cpp
+.clang_complete
