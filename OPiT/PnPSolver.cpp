@@ -90,9 +90,6 @@ int PnPSolver::foo(int verbalOutput)
 		);
 
 
-
-
-
 	Mat inliers;
 	/*
 	solvePnPRansac(): Finds an object pose from 3D-2D point correspondences using the RANSAC scheme.
@@ -258,8 +255,6 @@ int PnPSolver::foo(int verbalOutput)
 		cout << endl << "***********************************************" << endl << endl;
 	}
 
-
-
 	return 0;
 }
 
@@ -406,4 +401,9 @@ void PnPSolver::setVoVImagePoints()
 
 	PnPSolver::VoVImagePoints.push_back(imagepoints);
 	PnPSolver::VoVImagePoints.push_back(imagepoints2);
+}
+
+vector< vector<cv::Point2d> > PnPSolver::getVoVImagePoints()
+{
+	return PnPSolver::VoVImagePoints;
 }

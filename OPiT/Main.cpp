@@ -37,11 +37,11 @@ using namespace cv;
 int main(int argc, char** argv)
 {
     char entrance[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/out0/img_00433.png";
-    
+
     ManualCorrespondences(entrance);
-    
+
     MainWrapper();
-    
+
     return 0;
 }
 // uncomment here
@@ -213,7 +213,7 @@ int main(int argc, char** argv)
 //			<< "DIST = \t"	<< bestPoint[3] << endl;
 //		cout << "*****************************\n\n";
 //	}
-//    
+//
 //
 //	/*
 //	// Skeleton code for iterating through the image sequence

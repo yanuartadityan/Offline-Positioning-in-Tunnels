@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.0 FATAL_ERROR)
 
 #set compiler flag to C++11
 set (CMAKE_CXX_COMPILER "/usr/bin/clang++")
-set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -g -Wall")
+set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++")
 
 #project name
 project (OPiT)

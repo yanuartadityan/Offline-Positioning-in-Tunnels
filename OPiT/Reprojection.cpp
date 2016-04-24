@@ -1,5 +1,11 @@
 #include "Reprojection.h"
 #include "Calibration.h"
+#include "PCLCloudSearch.h"
+
+//PCL
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
 
 #include <opencv2/features2d.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -27,11 +33,11 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 	Mat disparity;
 
 	Ptr<StereoBM> sbm = StereoBM::create(
-		5 * 16,		// ndisparities, the disparity search range. For each pixel, the algorithm will find the best disparity from 0 (default minimum disparity) to ndisparities. 
+		5 * 16,		// ndisparities, the disparity search range. For each pixel, the algorithm will find the best disparity from 0 (default minimum disparity) to ndisparities.
 					//	The search range can then be shifted by changing the minimum disparity.
 
-		5			// SADWindowSize, the linear size of the blocks compared by the algorithm. The size should be odd (as the block is centered at the current pixel). 
-					//	Larger block size implies smoother, though less accurate disparity map. Smaller block size gives more detailed disparity map, 
+		5			// SADWindowSize, the linear size of the blocks compared by the algorithm. The size should be odd (as the block is centered at the current pixel).
+					//	Larger block size implies smoother, though less accurate disparity map. Smaller block size gives more detailed disparity map,
 					//		but there is higher chance for algorithm to find a wrong correspondence.
 
 		);
@@ -91,4 +97,93 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 	cout << "An item from _3dImage = " << endl << _3dImage.row(490).col(250) << endl << endl;
 
 	return _3dImage;
+}
+
+
+
+
+/*
+*	Projection algorithm from: http://stackoverflow.com/questions/13957150/opencv-computing-camera-position-rotation
+*
+*	Projection details: http://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/node3.html
+*
+*	Algebraic solution: https://www.siggraph.org/education/materials/HyperGraph/raytrace/rtinter1.htm
+*
+*	v' is camera space coordinate, v is world space coordinate
+*	v = R^T * v' - R^T * t
+*
+*	x = K * [R|t] * X
+*
+*/
+vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+{
+	const double THRESHOLD = 0.05;
+	const double MIN_DIST = 20.0;
+	const double MAX_DIST = 30.0;
+	const double DELTA_Z = 1;
+
+	vector<double> bestPoint{ 0, 0, 0, 1000 };
+	Mat p, p_, p3d;
+	double newX, newY, newZ;
+
+	for (double i = MIN_DIST; i < MAX_DIST; i += DELTA_Z)
+	{
+		/*
+		*	Take the image coordinates (X and Y) of the feature point,
+		*		together with i which represents going "one step further" on the ray.
+		*/
+		p = (Mat_<double>(3, 1) << i*imagepoint.x, i*imagepoint.y, i);
+
+
+		/*
+		*	We use the inverse camera matrix (K) to bring the image coordinate from the
+		*		Image coordinate system
+		*	to
+		*		Camera coordinate system
+		*
+		*
+		*/
+		p = K.inv() * p;
+
+
+		/*
+		*	To represent a 3D point in the world coordinate system as a homogeneous point,
+		*		we need a 4x1 vector, containing the X, Y, Z and a 1.
+		*/
+		p3d = (Mat_<double>(4, 1) << p.at<double>(0, 0), p.at<double>(1, 0), p.at<double>(2, 0), 1);
+
+
+		/*
+		*	We use our 4x4 transformation matrix (T), which is equal to our camera pose matrix,
+		*		to bring the point from the
+		*			Camera coordinate system
+		*		to
+		*			World coordinate system
+		*
+		*	If we have a point in camera coordinates, we can transform it to world coordinates.
+		*		p' = T * (x, y, z, 1)^T
+		*/
+		p_ = T * p3d;
+
+
+		/*
+		*	We use the calculated point inside the world coordinate system as the search point
+		*		for finding the closest neighbour (point) in the point cloud.
+		*/
+		newX = p_.at<double>(0, 0);	newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
+		vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud);
+
+		/*
+		*	As soon as we find a "good enough" point, return it,
+		*		since we don't want to risk going too deep into the cloud.
+		*/
+		if (newPoint[3] < THRESHOLD)
+		{
+			bestPoint = newPoint;
+			//cout << i << endl;
+			break;
+		}
+	}
+
+	return bestPoint;
 }
