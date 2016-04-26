@@ -233,26 +233,26 @@ int PnPSolver::foo(int verbalOutput)
 
 	if(verbalOutput)
 	{
-		cout << endl << "***********************************************" << endl << endl;
-
-		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
-
-		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
-
-		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
-
-		cout << "R =" << endl << rMat << endl << endl;
-
-		cout << "T =" << endl << tMat << endl << endl;
-
-		cout << "t =" << endl << tVec << endl << endl;
-
-		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
+//		cout << endl << "***********************************************" << endl << endl;
+//
+//		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
+//
+//		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
+//
+//		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
+//
+//		cout << "R =" << endl << rMat << endl << endl;
+//
+//		cout << "T =" << endl << tMat << endl << endl;
+//
+//		cout << "t =" << endl << tVec << endl << endl;
+//
+//		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
 
 		cout << "Camera Position = \t" << endl << cameraPosition << endl << endl;
 
 
-		cout << endl << "***********************************************" << endl << endl;
+//		cout << endl << "***********************************************" << endl << endl;
 	}
 
 	return 0;
