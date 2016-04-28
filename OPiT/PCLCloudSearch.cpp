@@ -9,14 +9,14 @@
 std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double z, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-	
+
 	kdtree.setInputCloud(cloud);
 
 	pcl::PointXYZ searchPoint;
 
 	searchPoint.x = x;
 	searchPoint.y = y;
-	searchPoint.z = z;	
+	searchPoint.z = z;
 
 	// K nearest neighbor search, we want only the nearest point.
 	int K = 1;
@@ -25,7 +25,7 @@ std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double 
 
 	std::vector<int> pointIdxNKNSearch(K);
 	std::vector<float> pointNKNSquaredDistance(K);
-	
+
 	//std::cout << "K nearest neighbor search at (" << searchPoint.x
 	//	<< " " << searchPoint.y
 	//	<< " " << searchPoint.z
@@ -49,8 +49,5 @@ std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double 
 			}
 		}
 	}
-
-	return bestPoint;
-
-	
+	return bestPoint;	
 }

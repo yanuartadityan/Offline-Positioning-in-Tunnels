@@ -33,11 +33,11 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 	Mat disparity;
 
 	Ptr<StereoBM> sbm = StereoBM::create(
-		5 * 16,		// ndisparities, the disparity search range. For each pixel, the algorithm will find the best disparity from 0 (default minimum disparity) to ndisparities. 
+		5 * 16,		// ndisparities, the disparity search range. For each pixel, the algorithm will find the best disparity from 0 (default minimum disparity) to ndisparities.
 					//	The search range can then be shifted by changing the minimum disparity.
 
-		5			// SADWindowSize, the linear size of the blocks compared by the algorithm. The size should be odd (as the block is centered at the current pixel). 
-					//	Larger block size implies smoother, though less accurate disparity map. Smaller block size gives more detailed disparity map, 
+		5			// SADWindowSize, the linear size of the blocks compared by the algorithm. The size should be odd (as the block is centered at the current pixel).
+					//	Larger block size implies smoother, though less accurate disparity map. Smaller block size gives more detailed disparity map,
 					//		but there is higher chance for algorithm to find a wrong correspondence.
 
 		);
@@ -120,7 +120,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 	const double THRESHOLD = 0.01;
 	const double MIN_DIST = 20.0;
 	const double MAX_DIST = 30.0;
-	const double DELTA_Z = 0.05;
+	const double DELTA_Z = 0.2;
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 	Mat p, p_, p3d;
@@ -170,13 +170,13 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud);
 
 		/*
-		*	As soon as we find a "good enough" point, return it, 
+		*	As soon as we find a "good enough" point, return it,
 		*		since we don't want to risk going too deep into the cloud.
 		*/
 		if (newPoint[3] < THRESHOLD)
 		{
 			bestPoint = newPoint;
-			cout << i << endl;
+			//cout << i << endl;
 			break;
 		}
 	}

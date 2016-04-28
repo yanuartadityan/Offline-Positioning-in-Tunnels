@@ -68,9 +68,6 @@ int PnPSolver::run(int verbalOutput)
 	//	);
 
 
-
-
-
 	Mat inliers;
 	/*
 	solvePnPRansac(): Finds an object pose from 3D-2D point correspondences using the RANSAC scheme.
@@ -214,26 +211,28 @@ int PnPSolver::run(int verbalOutput)
 
 	if(verbalOutput)
 	{
-		cout << endl << "***********************************************" << endl << endl;
+//		cout << endl << "***********************************************" << endl << endl;
+//
+//		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
+//
+//		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
+//
+//		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
+//
+//		cout << "R =" << endl << rMat << endl << endl;
+//
+//		cout << "T =" << endl << tMat << endl << endl;
+//
+//		cout << "t =" << endl << tVec << endl << endl;
+//
+//		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
 
-		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
-
-		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
-
-		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
-
-		cout << "R =" << endl << rMat << endl << endl;
-
-		cout << "T =" << endl << tMat << endl << endl;
-
-		cout << "t =" << endl << tVec << endl << endl;
-
-		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
-
-		cout << "Camera Position = \t" << endl << cameraPosition << endl << endl;
+		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
+									   << cameraPosition.at<double>(1) << ", "
+									   << cameraPosition.at<double>(2) << "]" << endl;
 
 
-		cout << endl << "***********************************************" << endl << endl;
+//		cout << endl << "***********************************************" << endl << endl;
 	}
 
 	return 0;
