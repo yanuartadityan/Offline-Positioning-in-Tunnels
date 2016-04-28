@@ -134,7 +134,6 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		*/
 		p = (Mat_<double>(3, 1) << i*imagepoint.x, i*imagepoint.y, i);
 
-
 		/*
 		*	We use the inverse camera matrix (K) to bring the image coordinate from the
 		*		Image coordinate system
@@ -145,13 +144,11 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		*/
 		p = K.inv() * p;
 
-
 		/*
 		*	To represent a 3D point in the world coordinate system as a homogeneous point,
 		*		we need a 4x1 vector, containing the X, Y, Z and a 1.
 		*/
 		p3d = (Mat_<double>(4, 1) << p.at<double>(0, 0), p.at<double>(1, 0), p.at<double>(2, 0), 1);
-
 
 		/*
 		*	We use our 4x4 transformation matrix (T), which is equal to our camera pose matrix,
@@ -164,7 +161,6 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		*		p' = T * (x, y, z, 1)^T
 		*/
 		p_ = T * p3d;
-
 
 		/*
 		*	We use the calculated point inside the world coordinate system as the search point

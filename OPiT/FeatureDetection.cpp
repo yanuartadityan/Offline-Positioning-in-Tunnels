@@ -193,29 +193,37 @@ void FeatureDetection::fastDetector(cv::Mat img, std::vector<cv::KeyPoint> &dete
     fastdetect_->detect(img, detectedPoints);
 }
 
+/*
+	SURF
+*/
 void FeatureDetection::surfDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints)
 {
     // detect keypoints using surf
     surfdetect_->detect(img, detectedPoints);
 }
+void FeatureDetection::surfExtraction(cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
+{
+	// extract descriptor from keypoints using surf
+	surfdetect_->compute(img, detectedPoints, descriptor);
+}
 
+/*
+	SIFT
+*/
 void FeatureDetection::siftDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints)
 {
     // detect keypoints using sift
     siftdetect_->detect(img, detectedPoints);
 }
-
-void FeatureDetection::surfExtraction(cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
+void FeatureDetection::siftExtraction(cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
 {
-    // extract descriptor from keypoints using surf
-    surfdetect_->compute(img, detectedPoints, descriptor);
+	// extract descriptor from keypoints using sift
+	siftextract_->compute(img, detectedPoints, descriptor);
 }
 
-void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
-{
-    // extract descriptor from keypoints using sift
-    siftdetect_->compute(img, detectedPoints, descriptor);
-}
+
+
+
 
 void FeatureDetection::bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<DMatch> > &matches)
 {

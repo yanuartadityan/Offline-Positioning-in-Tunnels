@@ -43,7 +43,7 @@ PnPSolver::PnPSolver()
 
 }
 
-int PnPSolver::foo(int verbalOutput)
+int PnPSolver::run(int verbalOutput)
 {
 
 	Calibration calib;
@@ -260,13 +260,13 @@ void PnPSolver::setImagePoints()
 	*/
 }
 
-void PnPSolver::setImagePoints(vector<Point2d> IP)
+void PnPSolver::setImagePoints(vector<Point2f> IP)
 {
 
 	PnPSolver::imagePoints = IP;
 }
 
-vector<cv::Point2d> PnPSolver::getImagePoints()
+vector<cv::Point2f> PnPSolver::getImagePoints()
 {
 	return PnPSolver::imagePoints;
 }
