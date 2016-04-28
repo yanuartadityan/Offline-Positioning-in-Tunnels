@@ -249,7 +249,9 @@ int PnPSolver::foo(int verbalOutput)
 //
 //		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
 
-		cout << "Camera Position = \t" << endl << cameraPosition << endl << endl;
+		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
+									   << cameraPosition.at<double>(1) << ", "
+									   << cameraPosition.at<double>(2) << "]" << endl;
 
 
 //		cout << endl << "***********************************************" << endl << endl;

@@ -45,7 +45,7 @@ void ManualCorrespondences(char *imagename)
         {
             if (areSame(i, init2D[j].x, init2D[j].y, kpts[i].pt.x, kpts[i].pt.y))
             {
-                cout << i << endl;
+                //cout << i << endl;
                 pxIdx.push_back(kpts[i]);
                 init2D.erase(init2D.begin()+j);
             }
@@ -54,16 +54,16 @@ void ManualCorrespondences(char *imagename)
 
     // extract descriptor
     fdet.siftExtraction(img, pxIdx, descriptor);
-    
-    for (int i = 0; i < pxIdx.size(); i++)
-    {
-        cout << pxIdx[i].pt << endl;
-    }
-    
+
+    // for (int i = 0; i < pxIdx.size(); i++)
+    // {
+    //     cout << pxIdx[i].pt << endl;
+    // }
+
     // save the descriptor to a file
 //    cv::FileStorage storage("ManualCorrespondences.yml", cv::FileStorage::WRITE);
 //    storage << "img" << descriptor;
 //    storage.release();
-//    
+//
 //    cout << "done" << endl;
 }
