@@ -21,3 +21,4 @@ set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -O2")
 #add subdirectory
 add_subdirectory (shared)
 add_subdirectory (exec)
+add_subdirectory (tests)

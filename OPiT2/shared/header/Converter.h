@@ -2,6 +2,7 @@
 #define __CONVERTER_H_INCLUDED__
 #include <opencv2/features2d.hpp>
 #include <iostream>
+
 class Converter
 {
 public:
@@ -18,7 +19,7 @@ public:
 
 	static std::string type2str(int);
 private:
-	
+
 };
 
 #endif
