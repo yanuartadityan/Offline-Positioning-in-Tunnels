@@ -126,6 +126,11 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 	Mat p, p_, p3d;
 	double newX, newY, newZ;
 
+	// setup the camera origin in world coordinate
+	Mat origin_p = (Mat_<double>(3,1) << 0, 0, 0);
+	Mat origin_c = K.inv() * origin_p;
+	Mat origin_w = T * (Mat_<double>(4, 1) << origin_c.at<double>(0, 0), origin_c.at<double>(1, 0), origin_c.at<double>(2, 0), 1);
+    
 	for (double i = MIN_DIST; i < MAX_DIST; i += DELTA_Z)
 	{
 		/*
@@ -165,7 +170,6 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		*/
 		p_ = T * p3d;
 
-
 		/*
 		*	We use the calculated point inside the world coordinate system as the search point
 		*		for finding the closest neighbour (point) in the point cloud.
@@ -179,11 +183,48 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		*/
 		if (newPoint[3] < THRESHOLD)
 		{
-			bestPoint = newPoint;
-			//cout << i << endl;
+			// return the lerp
+            bestPoint = LinearInterpolation (newPoint, origin_w, p_);
+
 			break;
 		}
 	}
 
 	return bestPoint;
+}
+
+vector<double> Reprojection::LinearInterpolation(vector<double> bestPoint, Mat origin, Mat vectorPoint)
+{
+	// basically if known two points in 3D A and B, and a point P (bestPoint) that does not belong to vector AB
+	// a perpendicular vector xP has 90 degree angle from AB and has length of bestPoint[3].
+	//
+	// x is the point in which we need to return. Ax is basically the orthogonal projection of AP
+	// to vector AB.
+	//
+	// it given as
+	// 		x = A + dot(AP,AB) / dot(AB,AB) * AB
+	//				with
+	//				 A   = origin
+	//				 P   = bestPoint
+	//				 B   = 3D point in line
+	//				 AP  = vector from origin to the point P (bestPoint)
+	// 				 AB  = vector from origin to the AB
+	//				 dot = dot product
+	// 				 *   = scalar multiplication
+    
+    Mat vectorAP = (Mat_<double>(4, 1) << bestPoint[0]-origin.at<double>(0), bestPoint[1]-origin.at<double>(1), bestPoint[2]-origin.at<double>(2), 0);
+    Mat vectorAB = vectorPoint - origin;
+    
+    Mat output = origin + (vectorAP.dot(vectorAB) / vectorAB.dot(vectorAB)) * vectorAB;
+    
+    if (false)
+    {
+        cout << endl;
+        cout << vectorAP << endl;
+        cout << vectorAB << endl;
+        cout << output << endl;
+        cout << "[" << bestPoint[0] << ";\n" << bestPoint[1] << ";\n" << bestPoint[2] << "]" << endl;
+    }
+    
+    return {output.at<double>(0), output.at<double>(1), output.at<double>(2)};
 }

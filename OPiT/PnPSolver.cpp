@@ -247,11 +247,13 @@ int PnPSolver::foo(int verbalOutput)
 //
 //		cout << "t =" << endl << tVec << endl << endl;
 //
-//		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
+		cout << "Camera Pose = [" << cameraPose.at<double>(0,3) << ", "
+						  << cameraPose.at<double>(1,3) << ", "
+						  << cameraPose.at<double>(2,3) << ", " << endl;
 
-		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
-									   << cameraPosition.at<double>(1) << ", "
-									   << cameraPosition.at<double>(2) << "]" << endl;
+//		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
+//									   << cameraPosition.at<double>(1) << ", "
+//									   << cameraPosition.at<double>(2) << "]" << endl;
 
 
 //		cout << endl << "***********************************************" << endl << endl;

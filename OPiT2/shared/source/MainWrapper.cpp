@@ -27,8 +27,9 @@
 #define STARTIDX    433
 #define FINISHIDX   438
 #define NUMTHREADS  8
-#define NUMPOINTS   640
+#define NUMPOINTS   320
 #define NUMTASK     NUMPOINTS/NUMTHREADS
+#define SEQMODE     0
 
 using namespace std;
 using namespace cv;
@@ -41,10 +42,8 @@ vector<Point2d>             tunnel2D;
 vector<Point3d>             tunnel3D;
 Mat                         tunnelDescriptor;
 mutex                  g_mutex;
-int tempCount = 0;
 
-void threadTest (void);
-void printTest (int idx);
+int tempCount = 0;
 void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile);
 void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int start, int end, int tidx);
 
@@ -59,8 +58,10 @@ int MainWrapper()
 
     // 1. load pointcloud
     PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);
-    io::loadPCDFile("cloud.pcd", *cloud);
-
+    io::loadPCDFile("cloud-voxelized.pcd", *cloud);
+    std::cerr 	<< "PointCloud before filtering: " << cloud->width * cloud->height
+                << " data points (" << pcl::getFieldsList (*cloud) << ")" << std::endl;
+                
     // 2. prepare the manual correspondences as a lookup table
     char map2Dto3D  [100];
     char mapDescrip [100];
@@ -152,66 +153,66 @@ int MainWrapper()
         // 11. reproject all 2D keypoints to 3D
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
-
+        
         // 12. clear
         tunnel2D.clear();
         tunnel3D.clear();
         tunnelDescriptor.release();
 
-        // vector<double> bestPoint{ 0, 0, 0, 1000 };
-        // int tempCount = 0;
-        //
-        // // sequential
-        // for(int counter = 0; counter < NUMPOINTS; counter++)
-        // {
-        //     cout << "  " << counter << "-th step: ";
-        //
-        //     Point2d queryPoints = Point2d(detectedkpts[counter].pt.x, detectedkpts[counter].pt.y);
-        //
-        //     cout << "backprojecting " << "(" << queryPoints.x << "," << queryPoints.y << ")" << "...";
-        //     bestPoint = Reprojection::backproject(T, K, queryPoints, cloud);
-        //
-        //     // Define the 3D coordinate
-        //     _3dcoord.x = bestPoint[0];
-        //     _3dcoord.y = bestPoint[1];
-        //     _3dcoord.z = bestPoint[2];
-        //
-        //     // Push the pair into the lookup table if it's not zero
-        //     if ((_3dcoord.x > 0.0f) && (_3dcoord.y > 0.0f) && (_3dcoord.z > 0.0f))
-        //     {
-        //         tempCount++;
-        //         cout << "found a point...(" << tempCount << ") at px-" << counter << endl;
-        //
-        //         // 12. Update the LUT
-        //         tunnel3D.push_back(_3dcoord);
-        //         tunnelDescriptor.push_back(descriptor.row(counter));
-        //
-        //         // For verifying PnP
-        //         _3dTemp.push_back(_3dcoord);
-        //         tunnel2D.push_back(queryPoints);
-        //     }
-        //     else
-        //         cout << "nothing found..." << endl;
-        // }
-
-
-
-        // parallel
-        thread *ts[NUMTHREADS];
-        cout << "\n going parallel..." << endl;
-
-        for (int tidx = 0; tidx < NUMTHREADS; tidx++)
+        if (SEQMODE)
         {
-            int start = tidx    * NUMTASK;
-            int end   = (tidx+1)* NUMTASK;
+            vector<double> bestPoint{ 0, 0, 0, 1000 };
+            for(int counter = 0; counter < NUMPOINTS; counter++)
+            {
+                cout << "  " << counter << "-th step: ";
 
-            // spawn threads
-            ts[tidx] = new thread (mpThread, T, K, detectedkpts, descriptor, cloud, start, end, tidx);
+                Point2d queryPoints = Point2d(detectedkpts[counter].pt.x, detectedkpts[counter].pt.y);
+
+                cout << "backprojecting " << "(" << queryPoints.x << "," << queryPoints.y << ")" << "...";
+                bestPoint = Reprojection::backproject(T, K, queryPoints, cloud);
+
+                // Define the 3D coordinate
+                _3dcoord.x = bestPoint[0];
+                _3dcoord.y = bestPoint[1];
+                _3dcoord.z = bestPoint[2];
+
+                // Push the pair into the lookup table if it's not zero
+                if ((_3dcoord.x > 0.0f) && (_3dcoord.y > 0.0f) && (_3dcoord.z > 0.0f))
+                {
+                    tempCount++;
+                    cout << "found a point...(" << tempCount << ") at px-" << counter << endl;
+
+                    // 12. Update the LUT
+                    tunnel3D.push_back(_3dcoord);
+                    tunnelDescriptor.push_back(descriptor.row(counter));
+
+                    // For verifying PnP
+                    _3dTemp.push_back(_3dcoord);
+                    tunnel2D.push_back(queryPoints);
+                }
+                else
+                cout << "nothing found..." << endl;
+            }
         }
-
-        for (int tidx = 0; tidx < NUMTHREADS; tidx ++)
+        else
+        // parallel
         {
-            ts[tidx]->join();
+            thread *ts[NUMTHREADS];
+            cout << "\ngoing parallel..." << endl;
+
+            for (int tidx = 0; tidx < NUMTHREADS; tidx++)
+            {
+                int start = tidx    * NUMTASK;
+                int end   = (tidx+1)* NUMTASK;
+
+                // spawn threads
+                ts[tidx] = new thread (mpThread, T, K, detectedkpts, descriptor, cloud, start, end, tidx);
+            }
+
+            for (int tidx = 0; tidx < NUMTHREADS; tidx ++)
+            {
+                ts[tidx]->join();
+            }
         }
 
         //redo the pnp solver
@@ -277,29 +278,6 @@ void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile)
     lstorage["img"] >> tunnelDescriptor;
     lstorage.release();
 
-}
-
-void threadTest (void)
-{
-    thread *t = new thread[NUMTHREADS];
-
-    for (int i = 0; i < NUMTHREADS; i++)
-    {
-        t[i] = thread (printTest, i);
-    }
-
-    cout << "Launched from the main" << endl;
-
-    for (int i = 0; i < NUMTHREADS; i++)
-    {
-        t[i].join();
-    }
-}
-
-void printTest (int idx)
-{
-    cout << "done by t-id: " << idx << endl;
-    sleep(1);
 }
 
 void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int start, int end, int tidx)
