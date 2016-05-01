@@ -61,9 +61,12 @@ void PCLCloudSearch::VoxelizeCloud (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, p
 	// Create the filtering object
     pcl::VoxelGrid<pcl::PointXYZ> voxelized;
 	voxelized.setInputCloud (cloud);
-	voxelized.setLeafSize (0.01f, 0.01f, 0.01f);
+	voxelized.setLeafSize (0.08f, 0.08f, 0.08f);
 	voxelized.filter (*cloudFiltered);
 
 	std::cerr 	<< "PointCloud after filtering: " << cloudFiltered->width * cloudFiltered->height
        			<< " data points (" << pcl::getFieldsList (*cloudFiltered) << ")" << std::endl;
+
+    pcl::io::savePCDFile("cloud-voxelized.pcd", *cloudFiltered);
+	std::cerr << "Saved " << cloudFiltered->points.size () << " data points to [voxelized.pcd]" << std::endl;
 }
