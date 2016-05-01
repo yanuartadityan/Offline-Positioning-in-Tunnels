@@ -19,6 +19,6 @@ else()
                         ./source/PointProjection.cpp
                         ./source/Reprojection.cpp
                         ./source/Triangulation.cpp
-                    ./source/VisualOdometry.cpp)
+                        ./source/VisualOdometry.cpp)
     add_library (shared ${LIB_SOURCES})
 endif()

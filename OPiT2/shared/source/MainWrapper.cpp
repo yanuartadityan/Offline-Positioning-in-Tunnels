@@ -25,9 +25,10 @@
 #include <mutex>
 
 #define STARTIDX    433
-#define FINISHIDX   453
+#define FINISHIDX   438
 #define NUMTHREADS  8
-#define NUMTASK     64/NUMTHREADS
+#define NUMPOINTS   640
+#define NUMTASK     NUMPOINTS/NUMTHREADS
 
 using namespace std;
 using namespace cv;
@@ -40,6 +41,7 @@ vector<Point2d>             tunnel2D;
 vector<Point3d>             tunnel3D;
 Mat                         tunnelDescriptor;
 mutex                  g_mutex;
+int tempCount = 0;
 
 void threadTest (void);
 void printTest (int idx);
@@ -57,7 +59,7 @@ int MainWrapper()
 
     // 1. load pointcloud
     PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);
-    io::loadPCDFile("entranceTunnelBig.pcd", *cloud);
+    io::loadPCDFile("cloud.pcd", *cloud);
 
     // 2. prepare the manual correspondences as a lookup table
     char map2Dto3D  [100];
@@ -78,16 +80,13 @@ int MainWrapper()
     vector<Point3d> _3dTemp;
 
     int idx = STARTIDX;
-    while (idx < STARTIDX+30)
+    while (idx < FINISHIDX)
     {
         // start timer
         high_resolution_clock::time_point t1, t2;
         t1 = high_resolution_clock::now();
 
         cout << "processing image-" << idx << "...";
-
-        // 4.pre. clear tunnel2D
-        tunnel2D.clear();
 
         // 4.pre. clear _3dTemp
         _3dTemp.clear();
@@ -107,11 +106,6 @@ int MainWrapper()
         // 7. match between
         vector<vector<DMatch> > matches;
         fdetect.bfMatcher(descriptor, tunnelDescriptor, matches);
-
-        // 7.1. clear tunnelDescriptor
-        cout << "releasing " << tunnel3D.size() << " LUT entries" << endl;
-        tunnelDescriptor.release();
-        tunnel3D.clear();
 
         // 8. retrieve the matches indices from the descriptor
         vector<int> matchedIndices;
@@ -159,10 +153,16 @@ int MainWrapper()
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
 
+        // 12. clear
+        tunnel2D.clear();
+        tunnel3D.clear();
+        tunnelDescriptor.release();
+
         // vector<double> bestPoint{ 0, 0, 0, 1000 };
         // int tempCount = 0;
+        //
         // // sequential
-        // for(int counter = 0; counter < 32/*detectedkpts.size()/4*/; counter++)
+        // for(int counter = 0; counter < NUMPOINTS; counter++)
         // {
         //     cout << "  " << counter << "-th step: ";
         //
@@ -176,18 +176,15 @@ int MainWrapper()
         //     _3dcoord.y = bestPoint[1];
         //     _3dcoord.z = bestPoint[2];
         //
-        //     // Define its descriptor, should have size 1x128
-        //     descTemp = descriptor.row(counter);
-        //
         //     // Push the pair into the lookup table if it's not zero
         //     if ((_3dcoord.x > 0.0f) && (_3dcoord.y > 0.0f) && (_3dcoord.z > 0.0f))
         //     {
         //         tempCount++;
-        //         cout << "found a point...(" << tempCount << ")" << endl;
+        //         cout << "found a point...(" << tempCount << ") at px-" << counter << endl;
         //
         //         // 12. Update the LUT
         //         tunnel3D.push_back(_3dcoord);
-        //         tunnelDescriptor.push_back(descTemp);
+        //         tunnelDescriptor.push_back(descriptor.row(counter));
         //
         //         // For verifying PnP
         //         _3dTemp.push_back(_3dcoord);
@@ -197,8 +194,11 @@ int MainWrapper()
         //         cout << "nothing found..." << endl;
         // }
 
+
+
         // parallel
         thread *ts[NUMTHREADS];
+        cout << "\n going parallel..." << endl;
 
         for (int tidx = 0; tidx < NUMTHREADS; tidx++)
         {
@@ -215,13 +215,14 @@ int MainWrapper()
         }
 
         //redo the pnp solver
-        /*cout << "now solving again using " << tunnelDescriptor.size() << " descriptors ";
+        cout << "\nnow solving again using " << tunnelDescriptor.size() << " descriptors ";
         cout << "and using " << tunnel2D.size() << " keypoints" << endl;
-        solver.setImagePoints(tunnel2D);
-        solver.setWorldPoints(_3dTemp);
-        solver.foo(1);
-        cout << tunnel2D << endl;
-        cout << _3dTemp << endl;*/
+
+        // cout << tunnel2D << endl;
+        // cout << tunnel3D << endl;
+        // solver.setImagePoints(tunnel2D);
+        // solver.setWorldPoints(tunnel3D);
+        // solver.foo(1);
 
         //increase the idx
         idx++;
@@ -305,35 +306,31 @@ void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::P
 {
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
-    Mat _mpDescTemp;
-    int tempCount = 0;
-    int index;
 
-    for (int i=start; i<end; i++)
+    for (int i=start; i<end; i+=8)
     {
-        index = tidx*NUMTASK+i;
-        temp = Reprojection::backproject(T, K, Point2d(imagepoint[index].pt.x,imagepoint[index].pt.y), cloud);
+        temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud);
 
         // Define the 3D coordinate
         _mp3dcoord.x = temp[0];
         _mp3dcoord.y = temp[1];
         _mp3dcoord.z = temp[2];
 
-        // Define its descriptor, should have size 1x128
-        _mpDescTemp = descriptor.row(index);
-
         // Push the pair into the lookup table if it's not zero
         if ((_mp3dcoord.x > 0.0f) && (_mp3dcoord.y > 0.0f) && (_mp3dcoord.z > 0.0f))
         {
-            tempCount++;
-            cout << "      tidx-" << tidx << " - found a point at px-" << i << "(" << tempCount << ")" << endl;
-
             // 12. Update the LUT
             lock_guard<mutex> lock(g_mutex);
-            tunnel3D.push_back(_mp3dcoord);
-            tunnelDescriptor.push_back(_mpDescTemp);
+            {
+                tunnel2D.push_back(Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y));
+                tunnel3D.push_back(_mp3dcoord);
+                tunnelDescriptor.push_back(descriptor.row(i));
+                tempCount++;
+
+                cout << "      tidx-" << tidx << " - found a point at px-" << i << "(" << tempCount << ")" << endl;
+            }
         }
         else
-            cout << "      tidx-" << tidx << " - nothing found..." << endl;
+            cout << "      tidx-" << tidx << " - nothing found at px-" << i << endl;
     }
 }
