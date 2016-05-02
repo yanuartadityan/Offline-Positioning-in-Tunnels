@@ -25,9 +25,9 @@
 #include <mutex>
 
 #define STARTIDX    433
-#define FINISHIDX   438
+#define FINISHIDX   443
 #define NUMTHREADS  8
-#define NUMPOINTS   320
+#define NUMPOINTS   480
 #define NUMTASK     NUMPOINTS/NUMTHREADS
 #define SEQMODE     0
 
@@ -119,6 +119,7 @@ int MainWrapper()
             auto dist1 = matches[i][0].distance;
             auto dist2 = matches[i][1].distance;
 
+            // based on lowe's it's 0.8 * dist, however we're using 0.6 for now
             if(dist1 < fdetect.getSiftMatchingRatio() * dist2)
             {
                 matchedIndices.push_back(first.trainIdx);
@@ -153,6 +154,8 @@ int MainWrapper()
         // 11. reproject all 2D keypoints to 3D
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
+
+        cout << T << endl;
 
         // 12. clear
         tunnel2D.clear();
