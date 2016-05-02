@@ -220,7 +220,7 @@ void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> de
 void FeatureDetection::bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<DMatch> > &matches)
 {
 	// matching using BF L2
-	matcher_->knnMatch(queryDesc, trainDesc, matches, 2);
+	matcher_->knnMatch(queryDesc, trainDesc, matches, 100);
 }
 
 void FeatureDetection::drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output)

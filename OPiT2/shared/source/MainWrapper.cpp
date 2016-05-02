@@ -38,9 +38,9 @@ using namespace std::chrono;
 
 // global variable for tunnel GPS mapping
 //unordered_map<Mat, Point3f> tunnelLut;
-vector<Point2d>             tunnel2D;
-vector<Point3d>             tunnel3D;
-Mat                         tunnelDescriptor;
+vector<Point2d>        tunnel2D;
+vector<Point3d>        tunnel3D;
+Mat                    tunnelDescriptor;
 mutex                  g_mutex;
 
 int tempCount = 0;
@@ -61,7 +61,7 @@ int MainWrapper()
     io::loadPCDFile("cloud-voxelized.pcd", *cloud);
     std::cerr 	<< "PointCloud before filtering: " << cloud->width * cloud->height
                 << " data points (" << pcl::getFieldsList (*cloud) << ")" << std::endl;
-                
+
     // 2. prepare the manual correspondences as a lookup table
     char map2Dto3D  [100];
     char mapDescrip [100];
@@ -153,7 +153,7 @@ int MainWrapper()
         // 11. reproject all 2D keypoints to 3D
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
-        
+
         // 12. clear
         tunnel2D.clear();
         tunnel3D.clear();
