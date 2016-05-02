@@ -120,7 +120,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 	const double THRESHOLD = 0.01;
 	const double MIN_DIST = 5.0;
 	const double MAX_DIST = 30.0;
-	const double DELTA_Z = 0.2;
+	const double DELTA_Z = 0.1;
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 	Mat p, p_, p3d;
@@ -130,7 +130,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 	Mat origin_p = (Mat_<double>(3,1) << 0, 0, 0);
 	Mat origin_c = K.inv() * origin_p;
 	Mat origin_w = T * (Mat_<double>(4, 1) << origin_c.at<double>(0, 0), origin_c.at<double>(1, 0), origin_c.at<double>(2, 0), 1);
-    
+
 	for (double i = MIN_DIST; i < MAX_DIST; i += DELTA_Z)
 	{
 		/*
@@ -211,12 +211,12 @@ vector<double> Reprojection::LinearInterpolation(vector<double> bestPoint, Mat o
 	// 				 AB  = vector from origin to the AB
 	//				 dot = dot product
 	// 				 *   = scalar multiplication
-    
+
     Mat vectorAP = (Mat_<double>(4, 1) << bestPoint[0]-origin.at<double>(0), bestPoint[1]-origin.at<double>(1), bestPoint[2]-origin.at<double>(2), 0);
     Mat vectorAB = vectorPoint - origin;
-    
+
     Mat output = origin + (vectorAP.dot(vectorAB) / vectorAB.dot(vectorAB)) * vectorAB;
-    
+
     if (false)
     {
         cout << endl;
@@ -225,6 +225,6 @@ vector<double> Reprojection::LinearInterpolation(vector<double> bestPoint, Mat o
         cout << output << endl;
         cout << "[" << bestPoint[0] << ";\n" << bestPoint[1] << ";\n" << bestPoint[2] << "]" << endl;
     }
-    
+
     return {output.at<double>(0), output.at<double>(1), output.at<double>(2)};
 }
