@@ -117,14 +117,19 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
-	const double THRESHOLD = 0.01;
+	const double THRESHOLD = 0.5;
 	const double MIN_DIST = 15.0;
-	const double MAX_DIST = 30.0;
-	const double DELTA_Z = 0.05;
+	const double MAX_DIST = 25.0;
+	const double DELTA_Z = 0.5;
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 	Mat p, p_, p3d;
 	double newX, newY, newZ;
+
+	// setup the camera origin in world coordinate
+	Mat origin_p = (Mat_<double>(3,1) << 0, 0, 0);
+	Mat origin_c = K.inv() * origin_p;
+	Mat origin_w = T * (Mat_<double>(4, 1) << origin_c.at<double>(0, 0), origin_c.at<double>(1, 0), origin_c.at<double>(2, 0), 1);
 
 	for (double i = MIN_DIST; i < MAX_DIST; i += DELTA_Z)
 	{
@@ -133,6 +138,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		*		together with i which represents going "one step further" on the ray.
 		*/
 		p = (Mat_<double>(3, 1) << i*imagepoint.x, i*imagepoint.y, i);
+
 
 		/*
 		*	We use the inverse camera matrix (K) to bring the image coordinate from the
@@ -144,11 +150,13 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		*/
 		p = K.inv() * p;
 
+
 		/*
 		*	To represent a 3D point in the world coordinate system as a homogeneous point,
 		*		we need a 4x1 vector, containing the X, Y, Z and a 1.
 		*/
 		p3d = (Mat_<double>(4, 1) << p.at<double>(0, 0), p.at<double>(1, 0), p.at<double>(2, 0), 1);
+
 
 		/*
 		*	We use our 4x4 transformation matrix (T), which is equal to our camera pose matrix,
@@ -172,18 +180,51 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		/*
 		*	As soon as we find a "good enough" point, return it,
 		*		since we don't want to risk going too deep into the cloud.
-		*
-		*	Previously we returned the neighbour that PCL found, but instead we want to return
-		*		the point on the line that resulted in this best neighbour.
 		*/
 		if (newPoint[3] < THRESHOLD)
-		{			
-			bestPoint = newPoint;
-			//bestPoint = { newX, newY, newZ, newPoint[3] };
+		{
+			// return the lerp
+            bestPoint = LinearInterpolation (newPoint, origin_w, p_);
+
 			break;
 		}
-		//i = i + newPoint[3] / 2;
 	}
 
 	return bestPoint;
+}
+
+vector<double> Reprojection::LinearInterpolation(vector<double> bestPoint, Mat origin, Mat vectorPoint)
+{
+	// basically if known two points in 3D A and B, and a point P (bestPoint) that does not belong to vector AB
+	// a perpendicular vector xP has 90 degree angle from AB and has length of bestPoint[3].
+	//
+	// x is the point in which we need to return. Ax is basically the orthogonal projection of AP
+	// to vector AB.
+	//
+	// it given as
+	// 		x = A + dot(AP,AB) / dot(AB,AB) * AB
+	//				with
+	//				 A   = origin
+	//				 P   = bestPoint
+	//				 B   = 3D point in line
+	//				 AP  = vector from origin to the point P (bestPoint)
+	// 				 AB  = vector from origin to the AB
+	//				 dot = dot product
+	// 				 *   = scalar multiplication
+
+    Mat vectorAP = (Mat_<double>(4, 1) << bestPoint[0]-origin.at<double>(0), bestPoint[1]-origin.at<double>(1), bestPoint[2]-origin.at<double>(2), 0);
+    Mat vectorAB = vectorPoint - origin;
+
+    Mat output = origin + (vectorAP.dot(vectorAB) / vectorAB.dot(vectorAB)) * vectorAB;
+
+    if (false)
+    {
+        cout << endl;
+        cout << vectorAP << endl;
+        cout << vectorAB << endl;
+        cout << output << endl;
+        cout << "[" << bestPoint[0] << ";\n" << bestPoint[1] << ";\n" << bestPoint[2] << "]" << endl;
+    }
+
+    return {output.at<double>(0), output.at<double>(1), output.at<double>(2)};
 }

@@ -1,7 +1,8 @@
-﻿#include <pcl/io/pcd_io.h>
+#include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/filters/voxel_grid.h>
 
 #include "PCLCloudSearch.h"
 
@@ -49,5 +50,23 @@ std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double 
 			}
 		}
 	}
-	return bestPoint;	
+	return bestPoint;
+}
+
+void PCLCloudSearch::VoxelizeCloud (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr cloudFiltered)
+{
+	std::cerr 	<< "PointCloud before filtering: " << cloud->width * cloud->height
+       			<< " data points (" << pcl::getFieldsList (*cloud) << ")" << std::endl;
+
+	// Create the filtering object
+    pcl::VoxelGrid<pcl::PointXYZ> voxelized;
+	voxelized.setInputCloud (cloud);
+	voxelized.setLeafSize (0.05f, 0.05f, 0.05f);
+	voxelized.filter (*cloudFiltered);
+
+	std::cerr 	<< "PointCloud after filtering: " << cloudFiltered->width * cloudFiltered->height
+       			<< " data points (" << pcl::getFieldsList (*cloudFiltered) << ")" << std::endl;
+
+    pcl::io::savePCDFile("cloud-voxelized.pcd", *cloudFiltered);
+	std::cerr << "Saved " << cloudFiltered->points.size () << " data points to [voxelized.pcd]" << std::endl;
 }
