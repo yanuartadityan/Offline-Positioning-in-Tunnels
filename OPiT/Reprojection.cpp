@@ -118,9 +118,9 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
 	const double THRESHOLD = 0.01;
-	const double MIN_DIST = 20.0;
+	const double MIN_DIST = 15.0;
 	const double MAX_DIST = 30.0;
-	const double DELTA_Z = 0.2;
+	const double DELTA_Z = 0.05;
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 	Mat p, p_, p3d;
@@ -172,13 +172,17 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		/*
 		*	As soon as we find a "good enough" point, return it,
 		*		since we don't want to risk going too deep into the cloud.
+		*
+		*	Previously we returned the neighbour that PCL found, but instead we want to return
+		*		the point on the line that resulted in this best neighbour.
 		*/
 		if (newPoint[3] < THRESHOLD)
-		{
+		{			
 			bestPoint = newPoint;
-			//cout << i << endl;
+			//bestPoint = { newX, newY, newZ, newPoint[3] };
 			break;
 		}
+		//i = i + newPoint[3] / 2;
 	}
 
 	return bestPoint;

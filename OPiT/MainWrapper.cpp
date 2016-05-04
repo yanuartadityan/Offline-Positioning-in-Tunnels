@@ -153,7 +153,7 @@ int MainWrapper()
         // 10. solvePNP using the XYZ
         solver.setImagePoints(retrieved2D);
         solver.setWorldPoints(retrieved3D);
-        solver.foo(1);
+        solver.run(1);
 
         // 11. reproject all 2D keypoints to 3D
         T = solver.getCameraPose().clone();
@@ -298,7 +298,7 @@ void threadTest (void)
 void printTest (int idx)
 {
     cout << "done by t-id: " << idx << endl;
-    sleep(1);
+    Sleep(1);
 }
 
 void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int start, int end, int tidx)

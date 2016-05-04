@@ -163,11 +163,11 @@ int PnPSolver::run(int verbalOutput)
 
 	Note that transposed rotation (R^t) does the inverse operation to original rotation but is much faster to calculate than  the inverse (R^-1).
 	*/
-	cameraPosition.create(3, 1, DataType<double>::type);
+	PnPSolver::cameraPosition.create(3, 1, DataType<double>::type);
 	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 1);
 
 	//cameraPosition = -1 * rMat.t() * tVec;
-	cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
+	PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
 
 
 
@@ -209,23 +209,24 @@ int PnPSolver::run(int verbalOutput)
 	*/
 
 
-	if(verbalOutput)
+	if (verbalOutput)
 	{
-//		cout << endl << "***********************************************" << endl << endl;
-//
-//		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
-//
-//		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
-//
-//		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
-//
-//		cout << "R =" << endl << rMat << endl << endl;
-//
-//		cout << "T =" << endl << tMat << endl << endl;
-//
-//		cout << "t =" << endl << tVec << endl << endl;
-//
-//		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
+		cout << endl << "***************************" << endl;
+
+		cout << "Essential Matrix = " << endl << getEssentialMatrix() << endl << endl;
+
+		cout << "Fundamental Matrix = " << endl << getFundamentalMatrix() << endl << endl;
+
+		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
+
+		cout << "R =" << endl << rMat << endl << endl;
+
+		cout << "T =" << endl << tMat << endl << endl;
+
+		cout << "t =" << endl << tVec << endl << endl;
+
+		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
+		cout << endl << "***********************************************" << endl << endl;
 
 		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
 									   << cameraPosition.at<double>(1) << ", "
@@ -259,13 +260,13 @@ void PnPSolver::setImagePoints()
 	*/
 }
 
-void PnPSolver::setImagePoints(vector<Point2f> IP)
+void PnPSolver::setImagePoints(vector<Point2d> IP)
 {
 
 	PnPSolver::imagePoints = IP;
 }
 
-vector<cv::Point2f> PnPSolver::getImagePoints()
+vector<cv::Point2d> PnPSolver::getImagePoints()
 {
 	return PnPSolver::imagePoints;
 }
