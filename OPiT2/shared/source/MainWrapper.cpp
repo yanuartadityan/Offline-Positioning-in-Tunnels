@@ -288,7 +288,7 @@ void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::P
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
 
-    for (int i=start; i<end; i+=8)
+    for (int i=start; i<end; i+=5)
     {
         temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud);
 
