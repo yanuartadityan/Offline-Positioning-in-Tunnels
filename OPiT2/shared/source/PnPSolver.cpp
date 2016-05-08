@@ -115,11 +115,11 @@ int PnPSolver::foo(int verbalOutput)
 		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 									//						of the rotation and translation vectors, respectively, and further optimizes them.
 		1000,						// ITERATIONS COUNT, number of iterations
-		10,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
+		5,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
 		0.99,						// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
-		CV_ITERATIVE);				// FLAGS, method for solving a PnP problem.
+		SOLVEPNP_EPNP);				// FLAGS, method for solving a PnP problem.
 
 
 	//Create the rotation matrix from the vector created above, by using the "Rodrigues"
@@ -247,10 +247,14 @@ int PnPSolver::foo(int verbalOutput)
 //
 //		cout << "t =" << endl << tVec << endl << endl;
 //
-		cout << "Camera Pose = [" << cameraPose.at<double>(0,3) << ", "
-                                  << cameraPose.at<double>(1,3) << ", "
-                                  << cameraPose.at<double>(2,3) << ", " << endl;
-        
+		// cout << "Camera Pose = [" << cameraPose.at<double>(0,3) << ", "
+        //                           << cameraPose.at<double>(1,3) << ", "
+        //                           << cameraPose.at<double>(2,3) << "]" << endl;
+
+		cout << "[" << cameraPose.at<double>(0,3) << ", "
+								  << cameraPose.at<double>(1,3) << ", "
+								  << cameraPose.at<double>(2,3) << "]" << endl;
+
 //		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
 //									   << cameraPosition.at<double>(1) << ", "
 //									   << cameraPosition.at<double>(2) << "]" << endl;
