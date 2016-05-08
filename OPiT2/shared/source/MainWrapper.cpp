@@ -25,11 +25,10 @@
 #include <mutex>
 
 #define STARTIDX    433
-#define FINISHIDX   443
+#define FINISHIDX   533
 #define NUMTHREADS  8
-#define NUMPOINTS   480
-#define NUMTASK     NUMPOINTS/NUMTHREADS
 #define SEQMODE     0
+#define STATICNTASK 480
 
 using namespace std;
 using namespace cv;
@@ -40,6 +39,8 @@ using namespace std::chrono;
 //unordered_map<Mat, Point3f> tunnelLut;
 vector<Point2d>        tunnel2D;
 vector<Point3d>        tunnel3D;
+vector<Point3d>        _3dTemp;
+vector<Point2d>        _2dTemp;
 Mat                    tunnelDescriptor;
 mutex                  g_mutex;
 
@@ -78,7 +79,6 @@ int MainWrapper()
     Mat T, K;
     Point3d _3dcoord;
     Mat descTemp;
-    vector<Point3d> _3dTemp;
 
     int idx = STARTIDX;
     while (idx < FINISHIDX)
@@ -88,9 +88,6 @@ int MainWrapper()
         t1 = high_resolution_clock::now();
 
         cout << "processing image-" << idx << "...";
-
-        // 4.pre. clear _3dTemp
-        _3dTemp.clear();
 
         // 4. load images
         sprintf(nextimage, "%simg_%05d.png", pathname, idx);
@@ -141,9 +138,9 @@ int MainWrapper()
         {
             retrieved2D.push_back(Point2d(detectedkpts[matchedIndices[i]].pt.x,detectedkpts[matchedIndices[i]].pt.y));
             retrieved3D.push_back(Point3d(tunnel3D[matchedXYZ[i]].x,tunnel3D[matchedXYZ[i]].y,tunnel3D[matchedXYZ[i]].z));
-            cout << std::fixed << setprecision(4);
-            cout << "   pushed {" << detectedkpts[matchedIndices[i]].pt.x << ", " << detectedkpts[matchedIndices[i]].pt.y << "} --> {"
-                                  << tunnel3D[matchedXYZ[i]].x << ", " << tunnel3D[matchedXYZ[i]].y << ", " << tunnel3D[matchedXYZ[i]].z << "}" << endl;
+            // cout << std::fixed << setprecision(4);
+            // cout << "   pushed {" << detectedkpts[matchedIndices[i]].pt.x << ", " << detectedkpts[matchedIndices[i]].pt.y << "} --> {"
+            //                      << tunnel3D[matchedXYZ[i]].x << ", " << tunnel3D[matchedXYZ[i]].y << ", " << tunnel3D[matchedXYZ[i]].z << "}" << endl;
         }
 
         // 10. solvePNP using the XYZ
@@ -155,24 +152,23 @@ int MainWrapper()
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
 
-        cout << T << endl;
-
         // 12. clear
-        tunnel2D.clear();
+        _2dTemp.clear();
+        _3dTemp.clear();
         tunnel3D.clear();
         tunnelDescriptor.release();
 
         if (SEQMODE)
         {
             vector<double> bestPoint{ 0, 0, 0, 1000 };
-            for(int counter = 0; counter < NUMPOINTS; counter++)
+            for(int counter = 0; counter < detectedkpts.size(); counter++)
             {
                 cout << "  " << counter << "-th step: ";
 
                 Point2d queryPoints = Point2d(detectedkpts[counter].pt.x, detectedkpts[counter].pt.y);
 
                 cout << "backprojecting " << "(" << queryPoints.x << "," << queryPoints.y << ")" << "...";
-                bestPoint = Reprojection::backproject(T, K, queryPoints, cloud);
+                bestPoint = Reprojection::backprojectRadius(T, K, queryPoints, cloud);
 
                 // Define the 3D coordinate
                 _3dcoord.x = bestPoint[0];
@@ -191,7 +187,7 @@ int MainWrapper()
 
                     // For verifying PnP
                     _3dTemp.push_back(_3dcoord);
-                    tunnel2D.push_back(queryPoints);
+                    _2dTemp.push_back(queryPoints);
                 }
                 else
                 cout << "nothing found..." << endl;
@@ -201,7 +197,10 @@ int MainWrapper()
         // parallel
         {
             thread *ts[NUMTHREADS];
-            cout << "\ngoing parallel..." << endl;
+            //cout << "\ngoing parallel..." << endl;
+
+            int NUMTASK = floor(detectedkpts.size()/NUMTHREADS);
+            //int NUMTASK = STATICNTASK/NUMTHREADS;
 
             for (int tidx = 0; tidx < NUMTHREADS; tidx++)
             {
@@ -219,14 +218,14 @@ int MainWrapper()
         }
 
         //redo the pnp solver
-        cout << "\nnow solving again using " << tunnelDescriptor.size() << " descriptors ";
-        cout << "and using " << tunnel2D.size() << " keypoints" << endl;
+        //cout << "\nnow solving again using " << tunnelDescriptor.size() << " descriptors ";
+        //cout << "and using " << tunnel2D.size() << " keypoints" << endl;
 
         // cout << tunnel2D << endl;
         // cout << tunnel3D << endl;
-        // solver.setImagePoints(tunnel2D);
-        // solver.setWorldPoints(tunnel3D);
-        // solver.foo(1);
+        solver.setImagePoints(_2dTemp);
+        solver.setWorldPoints(_3dTemp);
+        solver.foo(1);
 
         //increase the idx
         idx++;
@@ -288,9 +287,9 @@ void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::P
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
 
-    for (int i=start; i<end; i+=5)
+    for (int i=start; i<end; i+=4)
     {
-        temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud);
+        temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud);
 
         // Define the 3D coordinate
         _mp3dcoord.x = temp[0];
@@ -308,10 +307,14 @@ void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::P
                 tunnelDescriptor.push_back(descriptor.row(i));
                 tempCount++;
 
-                cout << "      tidx-" << tidx << " - found a point at px-" << i << "(" << tempCount << ")" << endl;
+                // For verifying PnP
+                _3dTemp.push_back(_mp3dcoord);
+                _2dTemp.push_back(Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y));
+
+                //cout << "      tidx-" << tidx << " - found a point at px-" << i << "(" << tempCount << ")" << endl;
             }
         }
-        else
-            cout << "      tidx-" << tidx << " - nothing found at px-" << i << endl;
+        // else
+        //     cout << "      tidx-" << tidx << " - nothing found at px-" << i << endl;
     }
 }
