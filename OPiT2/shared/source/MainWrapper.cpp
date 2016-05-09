@@ -24,11 +24,13 @@
 #include <chrono>
 #include <mutex>
 
-#define STARTIDX    433
-#define FINISHIDX   533
-#define NUMTHREADS  8
-#define SEQMODE     0
-#define STATICNTASK 480
+#define STARTIDX                433
+#define FINISHIDX               533
+#define NUMTHREADS              8
+#define SEQMODE                 0
+#define STATICNTASK             480
+#define DRAWKPTS                1
+#define KEYPOINTSUPPERLIM       2400
 
 using namespace std;
 using namespace cv;
@@ -93,13 +95,47 @@ int MainWrapper()
         sprintf(nextimage, "%simg_%05d.png", pathname, idx);
         Mat img = imread(nextimage);
 
+        // 4.1 set the ROI (region of interest)
+        // this mask is to take only 50% upper part of the image
+        Mat img_maskUpperPart = Mat::zeros(img.size(), CV_8U);
+        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows/2));
+        img_roiUpperPart = Scalar(255, 255, 255);
+
+        // this mask is to take 25% of the bottom right part of the image
+        Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
+        Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*2/5, img.rows/2, img.cols*2/5, img.rows*2/5));
+        img_roiRightPart = Scalar(255, 255, 255);
+
+        // combine the masks
+        Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
+
         // 5. perform sift feature detection and get kpt_i
         vector<KeyPoint> detectedkpts;
-        fdetect.siftDetector(img, detectedkpts);
+        fdetect.siftDetector(img, detectedkpts, img_combinedMask);
 
         // 6. perform sift feature extraction and get desc_i
         Mat descriptor;
         fdetect.siftExtraction(img, detectedkpts, descriptor);
+
+        // 6.1 draw the features
+        if (DRAWKPTS && (idx == 433))
+        {
+            vector<KeyPoint> detectedkptsnonROI;
+            Mat descriptorNonROI;
+            Mat outputROI;
+            Mat outputNonROI;
+
+            Mat img2 = imread(nextimage);
+
+            fdetect.siftDetector(img2, detectedkptsnonROI);
+            fdetect.siftExtraction(img2, detectedkptsnonROI, descriptorNonROI);
+
+            drawKeypoints(img2, detectedkptsnonROI, outputNonROI, Scalar(249, 205, 47), 4);
+            drawKeypoints(img, detectedkpts, outputROI, Scalar(249, 205, 47), 4);
+
+            imwrite("entrance-sift-non-roi.png", outputNonROI);
+            imwrite("entrance-sift-roi.png", outputROI);
+        }
 
         // 7. match between
         vector<vector<DMatch> > matches;
@@ -138,9 +174,9 @@ int MainWrapper()
         {
             retrieved2D.push_back(Point2d(detectedkpts[matchedIndices[i]].pt.x,detectedkpts[matchedIndices[i]].pt.y));
             retrieved3D.push_back(Point3d(tunnel3D[matchedXYZ[i]].x,tunnel3D[matchedXYZ[i]].y,tunnel3D[matchedXYZ[i]].z));
-            // cout << std::fixed << setprecision(4);
-            // cout << "   pushed {" << detectedkpts[matchedIndices[i]].pt.x << ", " << detectedkpts[matchedIndices[i]].pt.y << "} --> {"
-            //                      << tunnel3D[matchedXYZ[i]].x << ", " << tunnel3D[matchedXYZ[i]].y << ", " << tunnel3D[matchedXYZ[i]].z << "}" << endl;
+            cout << std::fixed << setprecision(4);
+            cout << "   pushed {" << detectedkpts[matchedIndices[i]].pt.x << ", " << detectedkpts[matchedIndices[i]].pt.y << "} --> {"
+                                 << tunnel3D[matchedXYZ[i]].x << ", " << tunnel3D[matchedXYZ[i]].y << ", " << tunnel3D[matchedXYZ[i]].z << "}" << endl;
         }
 
         // 10. solvePNP using the XYZ
@@ -151,6 +187,12 @@ int MainWrapper()
         // 11. reproject all 2D keypoints to 3D
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
+
+        // print camera pose
+        cout << std::fixed << setprecision(4);
+        cout << "initial camera pose [" << T.at<double>(0,3) << ", "
+                                        << T.at<double>(1,3) << ", "
+                                        << T.at<double>(2,3) << "]" << endl;
 
         // 12. clear
         _2dTemp.clear();
@@ -197,15 +239,20 @@ int MainWrapper()
         // parallel
         {
             thread *ts[NUMTHREADS];
-            //cout << "\ngoing parallel..." << endl;
+            cout << "\ngoing parallel..." << endl;
 
-            int NUMTASK = floor(detectedkpts.size()/NUMTHREADS);
-            //int NUMTASK = STATICNTASK/NUMTHREADS;
+            int numtask;
+            // if keypoints are too many
+            if (detectedkpts.size() > KEYPOINTSUPPERLIM)
+                numtask = KEYPOINTSUPPERLIM/NUMTHREADS;
+            // if keypoints are sufficient
+            else
+                numtask = floor(detectedkpts.size()/NUMTHREADS);
 
             for (int tidx = 0; tidx < NUMTHREADS; tidx++)
             {
-                int start = tidx    * NUMTASK;
-                int end   = (tidx+1)* NUMTASK;
+                int start = tidx    * numtask;
+                int end   = (tidx+1)* numtask;
 
                 // spawn threads
                 ts[tidx] = new thread (mpThread, T, K, detectedkpts, descriptor, cloud, start, end, tidx);
@@ -218,14 +265,17 @@ int MainWrapper()
         }
 
         //redo the pnp solver
-        //cout << "\nnow solving again using " << tunnelDescriptor.size() << " descriptors ";
-        //cout << "and using " << tunnel2D.size() << " keypoints" << endl;
-
-        // cout << tunnel2D << endl;
-        // cout << tunnel3D << endl;
+        cout << "\nnow solving again using " << _2dTemp.size() << " keypoints ";
+        cout << "and 3d correspondences" << endl;
         solver.setImagePoints(_2dTemp);
         solver.setWorldPoints(_3dTemp);
         solver.foo(1);
+
+        // print camera pose
+        cout << std::fixed << setprecision(4);
+        cout << "updated camera pose [" << T.at<double>(0,3) << ", "
+                                        << T.at<double>(1,3) << ", "
+                                        << T.at<double>(2,3) << "]" << endl;
 
         //increase the idx
         idx++;

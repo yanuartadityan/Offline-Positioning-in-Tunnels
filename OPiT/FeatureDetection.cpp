@@ -32,12 +32,12 @@ FeatureDetection::FeatureDetection()
 	// surf
 	min_hessian = 200;
 	octave_layer = 3;
-	contrast_threshold = 0.04;
-	edge_threshold = 10;
+	contrast_threshold = 0.01;			// default 0.04, lower value more features
+	edge_threshold = 20;				// default 10, higher value more features
 	sigma = 1.6;
 
 	// sift
-	sift_matching_ratio = 0.8;
+	sift_matching_ratio = 0.6;
 
 	//detector
 	fastdetect_ = FastFeatureDetector::create(
@@ -205,6 +205,12 @@ void FeatureDetection::siftDetector(cv::Mat img, std::vector<cv::KeyPoint> &dete
     siftdetect_->detect(img, detectedPoints);
 }
 
+void FeatureDetection::siftDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints, cv::Mat mask)
+{
+    // detect keypoints using sift
+    siftdetect_->detect(img, detectedPoints, mask);
+}
+
 void FeatureDetection::surfExtraction(cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
 {
     // extract descriptor from keypoints using surf
@@ -220,7 +226,7 @@ void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> de
 void FeatureDetection::bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<DMatch> > &matches)
 {
 	// matching using BF L2
-	matcher_->knnMatch(queryDesc, trainDesc, matches, 2);
+	matcher_->knnMatch(queryDesc, trainDesc, matches, 100);
 }
 
 void FeatureDetection::drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output)

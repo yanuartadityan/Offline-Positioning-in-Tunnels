@@ -29,9 +29,6 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 	cvtColor(frame2, frame2g, CV_BGRA2GRAY);
 	cvtColor(frame1, frame1g, CV_BGRA2GRAY);
 
-	//printf("Matrix: %s \n", type2str(frame1g.type()).c_str());
-	//printf("Matrix: %s \n", type2str(frame2g.type()).c_str());
-
 	Mat disparity;
 
 	Ptr<StereoBM> sbm = StereoBM::create(
@@ -119,7 +116,7 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
-    const double THRESHOLD = 0.5;
+    const double THRESHOLD = 0.1;
     const double MIN_DIST = 15.0;
     const double MAX_DIST = 25.0;
     const double DELTA_Z = 0.5;
