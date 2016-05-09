@@ -455,8 +455,8 @@ void VO::initParameter()
     // surf
     min_hessian = 200;
     octave_layer = 3;
-    contrast_threshold = 0.04;
-    edge_threshold = 10;
+    contrast_threshold = 0.01;
+    edge_threshold = 20;
     sigma = 1.6;
 
     // sift
