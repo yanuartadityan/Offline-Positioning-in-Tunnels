@@ -31,11 +31,10 @@ public:
 
 	void setVoVImagePoints();
 	std::vector< std::vector<cv::Point2d> > getVoVImagePoints();
-
-	
 	
 	int run(int verbal);
 
+	std::vector<cv::Mat> camPositions;
 	cv::Mat cameraPose34;
 	cv::Mat R, t;
 

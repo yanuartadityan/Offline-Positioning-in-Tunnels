@@ -117,10 +117,10 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
-	const double THRESHOLD = 0.5;
+	const double THRESHOLD = 0.25;
 	const double MIN_DIST = 15.0;
-	const double MAX_DIST = 25.0;
-	const double DELTA_Z = 0.5;
+	const double MAX_DIST = 50.0;
+	const double DELTA_Z = 0.25;
 
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 	Mat p, p_, p3d;
@@ -130,15 +130,21 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 	Mat origin_p = (Mat_<double>(3,1) << 0, 0, 0);
 	Mat origin_c = K.inv() * origin_p;
 	Mat origin_w = T * (Mat_<double>(4, 1) << origin_c.at<double>(0, 0), origin_c.at<double>(1, 0), origin_c.at<double>(2, 0), 1);
-
+	
+	
+	/*
+		On this weird cluster, this is one part that can be split into multiple jobs.
+			Each node gets one iteration of the for-loop, make sure results are gathered in
+			same order and then take the first result smaller than THRESHOLD.
+	*/
 	for (double i = MIN_DIST; i < MAX_DIST; i += DELTA_Z)
 	{
+		cout << endl << "Trying on " << i << endl << endl;
 		/*
 		*	Take the image coordinates (X and Y) of the feature point,
 		*		together with i which represents going "one step further" on the ray.
 		*/
 		p = (Mat_<double>(3, 1) << i*imagepoint.x, i*imagepoint.y, i);
-
 
 		/*
 		*	We use the inverse camera matrix (K) to bring the image coordinate from the
@@ -150,13 +156,11 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		*/
 		p = K.inv() * p;
 
-
 		/*
 		*	To represent a 3D point in the world coordinate system as a homogeneous point,
 		*		we need a 4x1 vector, containing the X, Y, Z and a 1.
 		*/
 		p3d = (Mat_<double>(4, 1) << p.at<double>(0, 0), p.at<double>(1, 0), p.at<double>(2, 0), 1);
-
 
 		/*
 		*	We use our 4x4 transformation matrix (T), which is equal to our camera pose matrix,
@@ -185,9 +189,15 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		{
 			// return the lerp
             bestPoint = LinearInterpolation (newPoint, origin_w, p_);
-
+			cout << "bestPoint found on " << i << " The distance was " << newPoint[3] << endl;
 			break;
 		}
+		cout << "No bestPoint found on " << i << " The distance was " << newPoint[3] << endl;
+		if (newPoint[3] > MAX_DIST)
+			break;
+
+		i = LinearInterpolation(newPoint, origin_w, p_)[2] + 0.5;
+		
 	}
 
 	return bestPoint;
