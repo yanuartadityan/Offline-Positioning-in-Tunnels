@@ -11,6 +11,7 @@
 #include <opencv2/xfeatures2d.hpp>
 
 #include <iostream>
+#include <iomanip>
 
 using namespace cv;
 using namespace std;
@@ -169,7 +170,7 @@ int PnPSolver::run(int verbalOutput)
 	//cameraPosition = -1 * rMat.t() * tVec;
 	PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
 
-
+	camPositions.push_back(PnPSolver::cameraPosition.clone());
 
 	/*
 		Taken from: https://en.wikipedia.org/wiki/Essential_matrix#3D_points_from_corresponding_image_points
@@ -228,7 +229,8 @@ int PnPSolver::run(int verbalOutput)
 		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
 		cout << endl << "***********************************************" << endl << endl;
 
-		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
+		cout<< setprecision(15)
+			<< "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
 									   << cameraPosition.at<double>(1) << ", "
 									   << cameraPosition.at<double>(2) << "]" << endl;
 
