@@ -37,7 +37,7 @@ FeatureDetection::FeatureDetection()
 	sigma = 1.6;
 
 	// sift
-	sift_matching_ratio = 0.6;
+	sift_matching_ratio = 0.8;
 
 	//detector
 	fastdetect_ = FastFeatureDetector::create(

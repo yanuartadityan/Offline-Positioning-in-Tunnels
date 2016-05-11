@@ -9,5 +9,5 @@ include_directories (${SHARED_INCLUDE_DIR})
 
 #main source
 set (EXEC_SOURCE Test-vo.cpp)
-add_executable (test_vo_OPiT2 ${EXEC_SOURCE})
-target_link_libraries (test_vo_OPiT2 shared ${OpenCV_LIBS} ${PCL_LIBRARIES})
+add_executable (test_vo ${EXEC_SOURCE})
+target_link_libraries (test_vo shared ${OpenCV_LIBS} ${PCL_LIBRARIES})
