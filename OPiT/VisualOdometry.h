@@ -34,15 +34,17 @@ private:
     
     char imagePath[100];
     
-    void featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2, int vo_method);
-    void fastDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
-    void siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
-    void surfDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
-    void akazeDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
-    void fastSiftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
-    void findPoses(cv::Mat prevImg, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2, int vo_method);
-    void drawPoints(cv::Mat img, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2);
-    
+	void featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2, int vo_method);
+	void featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat mask1, cv::Mat img2, std::vector<cv::Point2f>& points2, cv::Mat mask2, int vo_method);
+	void fastDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
+	void siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
+	void siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat mask1, cv::Mat img2, std::vector<cv::Point2f>& points2, cv::Mat mask2);
+	void surfDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
+	void akazeDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
+	void fastSiftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
+	void findPoses(cv::Mat prevImg, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2, int vo_method);
+	void drawPoints(cv::Mat img, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2);
+
     // param
     double imageScale;
     int iterationsCount;
