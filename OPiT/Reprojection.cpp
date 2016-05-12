@@ -6,6 +6,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 #include <opencv2/features2d.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -198,6 +199,77 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 
 		i = LinearInterpolation(newPoint, origin_w, p_)[2] + 0.5;
 		
+	}
+
+	return bestPoint;
+}
+
+// using radius instead
+vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+{
+	double MIN_DIST = 1.0f;			// in pixel
+	double MAX_DIST = 50.0f;		// in pixel
+	double min_dist_L2;
+	double max_dist_L2;
+	double RADIUS = 0.1f;			// meter
+	double THRESHOLD = 0.001f;		// meter
+	double DELTA_Z;					// meter
+
+	vector<double> bestPoint;
+	Mat p, p_, p3d;
+	double newX, newY, newZ;
+
+	// setup the camera origin in world coordinate
+	Mat origin_p = (Mat_<double>(3, 1) << 0, 0, 0);
+	Mat origin_c = K.inv() * origin_p;
+	Mat origin_w = T * (Mat_<double>(4, 1) << origin_c.at<double>(0, 0), origin_c.at<double>(1, 0), origin_c.at<double>(2, 0), 1);
+
+	// determine the DELTA_Z or distance between each search
+	// for each search point X with search radius r, if we got no best point, then we have to move
+	// the search point X+l distance. this l distance should be < 2r in order to handle possibility
+	// of the best point that is located right outside the intersection area of two search areas.
+	// more here:
+	//		http://mathworld.wolfram.com/Circle-CircleIntersection.html
+
+	// update the DELTA_Z (in meter)
+	DELTA_Z = 2 * sqrt(pow(RADIUS, 2) - pow(THRESHOLD, 2));
+
+	// find where this MIN_DIST and MAX_DIST in meter according to the imagepoint coordinate which still in pixels
+	Mat mindist_p = (Mat_<double>(3, 1) << imagepoint.x, imagepoint.y, MIN_DIST);
+	Mat mindist_c = K.inv() * mindist_p;
+	Mat mindist_w = T * (Mat_<double>(4, 1) << mindist_c.at<double>(0, 0), mindist_c.at<double>(1, 0), mindist_c.at<double>(2, 0), 1);
+
+	// find where this MIN_DIST and MAX_DIST in meter according to the imagepoint coordinate which still in pixels
+	Mat maxdist_p = (Mat_<double>(3, 1) << imagepoint.x, imagepoint.y, MAX_DIST);
+	Mat maxdist_c = K.inv() * maxdist_p;
+	Mat maxdist_w = T * (Mat_<double>(4, 1) << maxdist_c.at<double>(0, 0), maxdist_c.at<double>(1, 0), maxdist_c.at<double>(2, 0), 1);
+
+	// create a vector, start from the origin_w to mindist_w
+	Mat ray_w = mindist_w - origin_w;
+
+	min_dist_L2 = norm(origin_w, mindist_w, NORM_L2);
+	max_dist_L2 = norm(origin_w, maxdist_w, NORM_L2);
+
+	// prepare the kdtree
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+	kdtree.setInputCloud(cloud);
+
+	for (double i = min_dist_L2; i < max_dist_L2; i += DELTA_Z)
+	{
+		// calculation of the search point should be like this
+		Mat sPoint = mindist_w + i * ray_w;
+
+		//cout << i << endl;
+		//cout << sPoint << endl;
+
+		newX = sPoint.at<double>(0, 0); newY = sPoint.at<double>(1, 0), newZ = sPoint.at<double>(2, 0);
+		bestPoint = PCLCloudSearch::FindClosestPointRadius(newX, newY, newZ, RADIUS, THRESHOLD,
+			cloud, kdtree,
+			origin_w);
+
+		// return current bestPoint to the upper stack if the lerp distance is less than 1000.0f (default)
+		if (bestPoint[3] < 1000)
+			break;
 	}
 
 	return bestPoint;
