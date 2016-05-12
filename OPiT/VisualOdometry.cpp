@@ -14,8 +14,8 @@ using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
 
-#define STARTFRAME  1
-#define MAXFRAME    2000
+#define STARTFRAME  333
+#define MAXFRAME    1000
 
 /*
     A class for implementing visual odometry.
@@ -35,7 +35,7 @@ using namespace cv::xfeatures2d;
 VO::VO()											// WE HAVE TO TAKE DISTORTION INTO ACCOUNT!
 {																//							    Camera matrix
     cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));			//								___		  ___
-    imageScale = 1.5f;
+    imageScale = 1.0f;
 
 #ifndef KITTI_DATASET
 	cameraMatrix.at<double>(0, 0) = 1432.f/imageScale;						// Focal length X				| fx  0  cx |
@@ -227,6 +227,15 @@ void VO::featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::M
 
 }
 
+// with mask
+void VO::featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat mask1, cv::Mat img2, std::vector<cv::Point2f>& points2, cv::Mat mask2, int vo_method)
+{
+    if (vo_method == VO_METHOD_SIFT)
+        siftDetection(img1, points1, mask1, img2, points2, mask2);
+    else
+        cout << "mask only available in SIFT" << endl;
+}
+
 // adapted from AVI SINGH
 void VO::fastDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2)
 {
@@ -271,6 +280,75 @@ void VO::siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
 
     siftDetector->detectAndCompute(img1, noArray(), keypoints1, descriptor1);
     siftDetector->detectAndCompute(img2, noArray(), keypoints2, descriptor2);
+
+    std::vector<std::vector<cv::DMatch> > matches;
+    vector<KeyPoint> matched1, matched2;
+    cv::BFMatcher matcher;
+
+    matcher.knnMatch(descriptor1, descriptor2, matches, 200);  // Find two nearest matches
+
+    //  for (int i = 0; i < matches.size(); ++i)
+    //  {
+    //      DMatch first = matches[i][0];
+    //      float dist1 = matches[i][0].distance;
+    //      float dist2 = matches[i][1].distance;
+     //
+    //      if(dist1 < 0.6 * dist2)
+    //      {
+    //          matched1.push_back(keypoints1[first.queryIdx]);
+    //          matched2.push_back(keypoints2[first.trainIdx]);
+    //      }
+    //  }
+
+     //look whether the match is inside a defined area of the image
+     //only 25% of maximum of possible distance
+     double tresholdDist = 0.25 * sqrt(double(imageL.size().height*imageL.size().height + imageL.size().width*imageL.size().width));
+
+     vector<DMatch> good_matches2;
+     good_matches2.reserve(matches.size());
+     for (size_t i = 0; i < matches.size(); ++i)
+     {
+         for (int j = 0; j < matches[i].size(); j++)
+         {
+             Point2f from = keypoints1[matches[i][j].queryIdx].pt;
+             Point2f to = keypoints2[matches[i][j].trainIdx].pt;
+
+             //calculate local distance for each possible match
+             double dist = sqrt((from.x - to.x) * (from.x - to.x) + (from.y - to.y) * (from.y - to.y));
+
+             //save as best match if local distance is in specified area and on same height
+             if (dist < tresholdDist && abs(from.y-to.y)<5)
+             {
+                 good_matches2.push_back(matches[i][j]);
+
+                // get the output
+                matched1.push_back(keypoints1[])
+
+                j = matches[i].size();
+             }
+         }
+     }
+
+    // convert
+    cv::KeyPoint::convert(matched1, points1, vector<int>());
+    cv::KeyPoint::convert(matched2, points2, vector<int>());
+
+    // detect inliers by using F matrix
+    //kill outliers with ransac
+    vector<uchar> inliers(points1.size(),0);
+    findFundamentalMat(Mat(points1), Mat(points2), inliers, CV_FM_RANSAC, 3.f, 0.99f);
+}
+
+//SIFT with mask
+void VO::siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat mask1, cv::Mat img2, std::vector<cv::Point2f>& points2, cv::Mat mask2)
+{
+    Ptr<Feature2D> siftDetector = xfeatures2d::SIFT::create(0, octave_layer, contrast_threshold, edge_threshold, sigma);
+
+    vector<KeyPoint> keypoints1, keypoints2;
+    Mat descriptor1, descriptor2;
+
+    siftDetector->detectAndCompute(img1, mask1, keypoints1, descriptor1);
+    siftDetector->detectAndCompute(img2, mask2, keypoints2, descriptor2);
 
     std::vector<std::vector<cv::DMatch> > matches;
     vector<KeyPoint> matched1, matched2;
@@ -446,7 +524,7 @@ void VO::initParameter()
 
     /* 0 - fast,  1 - sift, 2 - surf,    3 - lukaskanade
        4 - akaze, 5 - orb,  6 - fastsift */
-    vo_method = 1;
+    vo_method = 0;
 
     // fast
     fast_threshold = 20;
@@ -454,8 +532,8 @@ void VO::initParameter()
 
     // surf
     min_hessian = 200;
-    octave_layer = 3;
-    contrast_threshold = 0.04;
+    octave_layer = 4;
+    contrast_threshold = 0.005f;
     edge_threshold = 10;
     sigma = 1.6;
 

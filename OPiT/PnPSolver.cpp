@@ -121,7 +121,6 @@ int PnPSolver::foo(int verbalOutput)
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
 		SOLVEPNP_EPNP);				// FLAGS, method for solving a PnP problem.
 
-
 	//Create the rotation matrix from the vector created above, by using the "Rodrigues"
 	rMat.create(3, 3, DataType<double>::type);
 	Rodrigues(rVec, rMat);
@@ -251,9 +250,9 @@ int PnPSolver::foo(int verbalOutput)
         //                           << cameraPose.at<double>(1,3) << ", "
         //                           << cameraPose.at<double>(2,3) << "]" << endl;
 
-		// cout << "[" << cameraPose.at<double>(0,3) << ", "
-		// 						  << cameraPose.at<double>(1,3) << ", "
-		// 						  << cameraPose.at<double>(2,3) << "]" << endl;
+		cout << "[" << cameraPose.at<double>(0,3) << ", "
+								  << cameraPose.at<double>(1,3) << ", "
+								  << cameraPose.at<double>(2,3) << "]" << endl;
 
 //		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
 //									   << cameraPosition.at<double>(1) << ", "
