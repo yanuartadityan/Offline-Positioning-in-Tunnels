@@ -32,12 +32,12 @@ FeatureDetection::FeatureDetection()
 	// surf
 	min_hessian = 200;
 	octave_layer = 3;
-	contrast_threshold = 0.04;
-	edge_threshold = 10;
+	contrast_threshold = 0.01;			// default 0.04, lower value more features
+	edge_threshold = 20;				// default 10, higher value more features
 	sigma = 1.6;
 
 	// sift
-	sift_matching_ratio = 0.6;
+	sift_matching_ratio = 0.8;
 
 	//detector
 	fastdetect_ = FastFeatureDetector::create(
@@ -203,6 +203,12 @@ void FeatureDetection::siftDetector(cv::Mat img, std::vector<cv::KeyPoint> &dete
 {
     // detect keypoints using sift
     siftdetect_->detect(img, detectedPoints);
+}
+
+void FeatureDetection::siftDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints, cv::Mat mask)
+{
+    // detect keypoints using sift
+    siftdetect_->detect(img, detectedPoints, mask);
 }
 
 void FeatureDetection::surfExtraction(cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)

@@ -24,12 +24,13 @@
 #include <chrono>
 #include <mutex>
 
-#define STARTIDX    433
-#define FINISHIDX   443
-#define NUMTHREADS  8
-#define NUMPOINTS   480
-#define NUMTASK     NUMPOINTS/NUMTHREADS
-#define SEQMODE     0
+#define STARTIDX                433
+#define FINISHIDX               533
+#define NUMTHREADS              8
+#define SEQMODE                 0
+#define STATICNTASK             480
+#define DRAWKPTS                1
+#define KEYPOINTSUPPERLIM       2400
 
 using namespace std;
 using namespace cv;
@@ -40,6 +41,9 @@ using namespace std::chrono;
 //unordered_map<Mat, Point3f> tunnelLut;
 vector<Point2d>        tunnel2D;
 vector<Point3d>        tunnel3D;
+vector<Point3d>        _3dTemp;             // found 3d world points
+vector<Point2d>        _2dTemp;             // corresponding 2d pixels
+vector<int>            _1dTemp;             // corresponding indices relative to the query set
 Mat                    tunnelDescriptor;
 mutex                  g_mutex;
 
@@ -78,7 +82,6 @@ int MainWrapper()
     Mat T, K;
     Point3d _3dcoord;
     Mat descTemp;
-    vector<Point3d> _3dTemp;
 
     int idx = STARTIDX;
     while (idx < FINISHIDX)
@@ -89,20 +92,51 @@ int MainWrapper()
 
         cout << "processing image-" << idx << "...";
 
-        // 4.pre. clear _3dTemp
-        _3dTemp.clear();
-
         // 4. load images
         sprintf(nextimage, "%simg_%05d.png", pathname, idx);
         Mat img = imread(nextimage);
 
+        // 4.1 set the ROI (region of interest)
+        // this mask is to take only 50% upper part of the image
+        Mat img_maskUpperPart = Mat::zeros(img.size(), CV_8U);
+        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows/2));
+        img_roiUpperPart = Scalar(255, 255, 255);
+
+        // this mask is to take 25% of the bottom right part of the image
+        Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
+        Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows/2, img.cols*2/5, img.rows*2/5));
+        img_roiRightPart = Scalar(255, 255, 255);
+
+        // combine the masks
+        Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
+
         // 5. perform sift feature detection and get kpt_i
         vector<KeyPoint> detectedkpts;
-        fdetect.siftDetector(img, detectedkpts);
+        fdetect.siftDetector(img, detectedkpts, img_combinedMask);
 
         // 6. perform sift feature extraction and get desc_i
         Mat descriptor;
         fdetect.siftExtraction(img, detectedkpts, descriptor);
+
+        // 6.1 draw the features
+        if (DRAWKPTS && (idx == STARTIDX))
+        {
+            vector<KeyPoint> detectedkptsnonROI;
+            Mat descriptorNonROI;
+            Mat outputROI;
+            Mat outputNonROI;
+
+            Mat img2 = imread(nextimage);
+
+            fdetect.siftDetector(img2, detectedkptsnonROI);
+            fdetect.siftExtraction(img2, detectedkptsnonROI, descriptorNonROI);
+
+            drawKeypoints(img2, detectedkptsnonROI, outputNonROI, Scalar(249, 205, 47), 4);
+            drawKeypoints(img, detectedkpts, outputROI, Scalar(249, 205, 47), 4);
+
+            imwrite("entrance-sift-non-roi.png", outputNonROI);
+            imwrite("entrance-sift-roi.png", outputROI);
+        }
 
         // 7. match between
         vector<vector<DMatch> > matches;
@@ -141,12 +175,13 @@ int MainWrapper()
         {
             retrieved2D.push_back(Point2d(detectedkpts[matchedIndices[i]].pt.x,detectedkpts[matchedIndices[i]].pt.y));
             retrieved3D.push_back(Point3d(tunnel3D[matchedXYZ[i]].x,tunnel3D[matchedXYZ[i]].y,tunnel3D[matchedXYZ[i]].z));
-            cout << std::fixed << setprecision(4);
-            cout << "   pushed {" << detectedkpts[matchedIndices[i]].pt.x << ", " << detectedkpts[matchedIndices[i]].pt.y << "} --> {"
-                                  << tunnel3D[matchedXYZ[i]].x << ", " << tunnel3D[matchedXYZ[i]].y << ", " << tunnel3D[matchedXYZ[i]].z << "}" << endl;
+            // cout << std::fixed << setprecision(4);
+            // cout << "   pushed {" << detectedkpts[matchedIndices[i]].pt.x << ", " << detectedkpts[matchedIndices[i]].pt.y << "} --> {"
+            //                      << tunnel3D[matchedXYZ[i]].x << ", " << tunnel3D[matchedXYZ[i]].y << ", " << tunnel3D[matchedXYZ[i]].z << "}" << endl;
         }
 
         // 10. solvePNP using the XYZ
+        cout << "  camera pose at frame-" << idx << ": ";
         solver.setImagePoints(retrieved2D);
         solver.setWorldPoints(retrieved3D);
         solver.foo(1);
@@ -155,24 +190,30 @@ int MainWrapper()
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
 
-        cout << T << endl;
+        // print camera pose
+        // cout << std::fixed << setprecision(4);
+        // cout << "initial camera pose [" << T.at<double>(0,3) << ", "
+        //                                 << T.at<double>(1,3) << ", "
+        //                                 << T.at<double>(2,3) << "]" << endl;
 
         // 12. clear
-        tunnel2D.clear();
+        _1dTemp.clear();
+        _2dTemp.clear();
+        _3dTemp.clear();
         tunnel3D.clear();
         tunnelDescriptor.release();
 
         if (SEQMODE)
         {
             vector<double> bestPoint{ 0, 0, 0, 1000 };
-            for(int counter = 0; counter < NUMPOINTS; counter++)
+            for(int counter = 0; counter < detectedkpts.size(); counter++)
             {
                 cout << "  " << counter << "-th step: ";
 
                 Point2d queryPoints = Point2d(detectedkpts[counter].pt.x, detectedkpts[counter].pt.y);
 
                 cout << "backprojecting " << "(" << queryPoints.x << "," << queryPoints.y << ")" << "...";
-                bestPoint = Reprojection::backproject(T, K, queryPoints, cloud);
+                bestPoint = Reprojection::backprojectRadius(T, K, queryPoints, cloud);
 
                 // Define the 3D coordinate
                 _3dcoord.x = bestPoint[0];
@@ -191,7 +232,7 @@ int MainWrapper()
 
                     // For verifying PnP
                     _3dTemp.push_back(_3dcoord);
-                    tunnel2D.push_back(queryPoints);
+                    _2dTemp.push_back(queryPoints);
                 }
                 else
                 cout << "nothing found..." << endl;
@@ -201,12 +242,21 @@ int MainWrapper()
         // parallel
         {
             thread *ts[NUMTHREADS];
-            cout << "\ngoing parallel..." << endl;
+            cout << "  going parallel to backproject " << detectedkpts.size() << " keypoints into the cloud" << endl;
+
+            int numtask;
+
+            // if keypoints are too many
+            if (detectedkpts.size() > KEYPOINTSUPPERLIM)
+                numtask = KEYPOINTSUPPERLIM/NUMTHREADS;
+            // if keypoints are sufficient
+            else
+                numtask = floor(detectedkpts.size()/NUMTHREADS);
 
             for (int tidx = 0; tidx < NUMTHREADS; tidx++)
             {
-                int start = tidx    * NUMTASK;
-                int end   = (tidx+1)* NUMTASK;
+                int start = tidx    * numtask;
+                int end   = (tidx+1)* numtask;
 
                 // spawn threads
                 ts[tidx] = new thread (mpThread, T, K, detectedkpts, descriptor, cloud, start, end, tidx);
@@ -216,17 +266,50 @@ int MainWrapper()
             {
                 ts[tidx]->join();
             }
+
+            cout << "  succesfully backproject " << _3dTemp.size() << " 3d points" << endl;
         }
 
         //redo the pnp solver
-        cout << "\nnow solving again using " << tunnelDescriptor.size() << " descriptors ";
-        cout << "and using " << tunnel2D.size() << " keypoints" << endl;
+        cout << "  now solving again using " << _2dTemp.size() << " keypoints ";
+        cout << "and 3d correspondences" << endl;
 
-        // cout << tunnel2D << endl;
-        // cout << tunnel3D << endl;
-        // solver.setImagePoints(tunnel2D);
-        // solver.setWorldPoints(tunnel3D);
-        // solver.foo(1);
+        cout << "  refined pose at frame-" << idx << ": ";
+        solver.setImagePoints(_2dTemp);
+        solver.setWorldPoints(_3dTemp);
+        solver.foo(1);
+
+        // check reprojection error of each backprojected world points
+        vector<Point2d> reprojectedPixels;
+        projectPoints(_3dTemp,
+                      solver.getRotationMatrix(),
+                      solver.getTranslationVector(),
+                      calib.getCameraMatrix(),
+                      calib.getDistortionCoeffs(),
+                      reprojectedPixels);
+
+        double repError = 0;
+        for (int itx = 0; itx < _1dTemp.size(); itx++)
+        {
+            double dx, dy;
+
+            dx = pow(abs(reprojectedPixels[itx].x - detectedkpts[_1dTemp[itx]].pt.x), 2);
+            dy = pow(abs(reprojectedPixels[itx].y - detectedkpts[_1dTemp[itx]].pt.y), 2);
+
+            repError += sqrt(dx + dy);
+
+            // cout << std::fixed << setprecision(2);
+            // cout << "  project 3D [" << _3dTemp[itx].x << ","
+            //                          << _3dTemp[itx].y << ","
+            //                          << _3dTemp[itx].z << "] -- 2D ["
+            //                             << reprojectedPixels[itx].x << ","
+            //                             << reprojectedPixels[itx].y << "] -- Px ["
+            //                                 << detectedkpts[_1dTemp[itx]].pt.x << ","
+            //                                 << detectedkpts[_1dTemp[itx]].pt.y << "]" << endl;
+
+        }
+
+        cout << "  avg reprojection error for " << _1dTemp.size() << " points is: " << repError/_1dTemp.size() << " px " << endl;
 
         //increase the idx
         idx++;
@@ -234,7 +317,7 @@ int MainWrapper()
         //report the exec
         t2 = high_resolution_clock::now();
         auto duration1 = duration_cast<milliseconds>( t2 - t1 ).count();
-        cout << "finish in " << duration1 << "ms (" << duration1/1000 << " sec)" << endl;
+        cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)\n" << endl;
     }
 
     return 1;
@@ -288,9 +371,9 @@ void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::P
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
 
-    for (int i=start; i<end; i+=5)
+    for (int i=start; i<end; i+=4)
     {
-        temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud);
+        temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud);
 
         // Define the 3D coordinate
         _mp3dcoord.x = temp[0];
@@ -308,10 +391,16 @@ void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::P
                 tunnelDescriptor.push_back(descriptor.row(i));
                 tempCount++;
 
-                cout << "      tidx-" << tidx << " - found a point at px-" << i << "(" << tempCount << ")" << endl;
+                // project again to check the reprojection error
+
+                // For verifying PnP
+                _3dTemp.push_back(_mp3dcoord);
+                _2dTemp.push_back(Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y));
+                _1dTemp.push_back(i);
+                //cout << "      tidx-" << tidx << " - found a point at px-" << i << "(" << tempCount << ")" << endl;
             }
         }
-        else
-            cout << "      tidx-" << tidx << " - nothing found at px-" << i << endl;
+        // else
+        //     cout << "      tidx-" << tidx << " - nothing found at px-" << i << endl;
     }
 }

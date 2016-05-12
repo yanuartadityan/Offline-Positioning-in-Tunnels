@@ -32,8 +32,8 @@ FeatureDetection::FeatureDetection()
 	// surf
 	min_hessian = 200;
 	octave_layer = 3;
-	contrast_threshold = 0.04;
-	edge_threshold = 10;
+	contrast_threshold = 0.01;			// default 0.04, lower value more features
+	edge_threshold = 20;				// default 10, higher value more features
 	sigma = 1.6;
 
 	// sift
@@ -193,42 +193,40 @@ void FeatureDetection::fastDetector(cv::Mat img, std::vector<cv::KeyPoint> &dete
     fastdetect_->detect(img, detectedPoints);
 }
 
-/*
-	SURF
-*/
 void FeatureDetection::surfDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints)
 {
     // detect keypoints using surf
     surfdetect_->detect(img, detectedPoints);
 }
-void FeatureDetection::surfExtraction(cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
-{
-	// extract descriptor from keypoints using surf
-	surfdetect_->compute(img, detectedPoints, descriptor);
-}
 
-/*
-	SIFT
-*/
 void FeatureDetection::siftDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints)
 {
     // detect keypoints using sift
     siftdetect_->detect(img, detectedPoints);
 }
-void FeatureDetection::siftExtraction(cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
+
+void FeatureDetection::siftDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints, cv::Mat mask)
 {
-	// extract descriptor from keypoints using sift
-	siftextract_->compute(img, detectedPoints, descriptor);
+    // detect keypoints using sift
+    siftdetect_->detect(img, detectedPoints, mask);
 }
 
+void FeatureDetection::surfExtraction(cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
+{
+    // extract descriptor from keypoints using surf
+    surfdetect_->compute(img, detectedPoints, descriptor);
+}
 
-
-
+void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &descriptor)
+{
+    // extract descriptor from keypoints using sift
+    siftdetect_->compute(img, detectedPoints, descriptor);
+}
 
 void FeatureDetection::bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<DMatch> > &matches)
 {
 	// matching using BF L2
-	matcher_->knnMatch(queryDesc, trainDesc, matches, 2);
+	matcher_->knnMatch(queryDesc, trainDesc, matches, 100);
 }
 
 void FeatureDetection::drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output)
