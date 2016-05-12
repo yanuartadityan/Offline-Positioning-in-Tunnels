@@ -18,6 +18,7 @@
 #include "Reprojection.h"
 
 #include <iostream>
+#include <fstream>
 #include <numeric>
 #include <thread>
 #include <future>
@@ -27,10 +28,11 @@
 #define STARTIDX                433
 #define FINISHIDX               533
 #define NUMTHREADS              8
-#define SEQMODE                 0
 #define STATICNTASK             480
 #define DRAWKPTS                1
 #define KEYPOINTSUPPERLIM       2400
+#define SEQMODE                 0
+#define LOGMODE                 1
 
 using namespace std;
 using namespace cv;
@@ -54,6 +56,8 @@ void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::P
 int MainWrapper()
 {
     //threadTest();
+    ofstream logFile;
+    logFile.open ("logFile.txt");
 
     //Calibration moved to its own class.
     Calibration calib;
@@ -196,6 +200,12 @@ int MainWrapper()
         //                                 << T.at<double>(1,3) << ", "
         //                                 << T.at<double>(2,3) << "]" << endl;
 
+        if (logMode)
+        {
+            logFile << "[" << << T.at<double>(0,3) << ", "
+                              << T.at<double>(1,3) << ", "
+                              << T.at<double>(2,3) << "] ";
+        }
         // 12. clear
         _1dTemp.clear();
         _2dTemp.clear();
