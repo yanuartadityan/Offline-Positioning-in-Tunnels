@@ -287,27 +287,37 @@ int MainWrapper()
                       calib.getCameraMatrix(),
                       calib.getDistortionCoeffs(),
                       reprojectedPixels);
-        
+
+        double repError = 0;
         for (int itx = 0; itx < _1dTemp.size(); itx++)
         {
-            cout << std::fixed << setprecision(2);
-            cout << "  project 3D [" << _3dTemp[itx].x << ","
-                                     << _3dTemp[itx].y << ","
-                                     << _3dTemp[itx].z << "] -- 2D ["
-                                        << reprojectedPixels[itx].x << ","
-                                        << reprojectedPixels[itx].y << "] -- Px ["
-                                            << detectedkpts[_1dTemp[itx]].pt.x << ","
-                                            << detectedkpts[_1dTemp[itx]].pt.y << "]" << endl;
-            
+            double dx, dy;
+
+            dx = pow(abs(reprojectedPixels[itx].x - detectedkpts[_1dTemp[itx]].pt.x), 2);
+            dy = pow(abs(reprojectedPixels[itx].y - detectedkpts[_1dTemp[itx]].pt.y), 2);
+
+            repError += sqrt(dx + dy);
+
+            // cout << std::fixed << setprecision(2);
+            // cout << "  project 3D [" << _3dTemp[itx].x << ","
+            //                          << _3dTemp[itx].y << ","
+            //                          << _3dTemp[itx].z << "] -- 2D ["
+            //                             << reprojectedPixels[itx].x << ","
+            //                             << reprojectedPixels[itx].y << "] -- Px ["
+            //                                 << detectedkpts[_1dTemp[itx]].pt.x << ","
+            //                                 << detectedkpts[_1dTemp[itx]].pt.y << "]" << endl;
+
         }
-        
+
+        cout << "  avg reprojection error for " << _1dTemp.size() << " points is: " << repError/_1dTemp.size() << " px " << endl;
+
         //increase the idx
         idx++;
 
         //report the exec
         t2 = high_resolution_clock::now();
         auto duration1 = duration_cast<milliseconds>( t2 - t1 ).count();
-        cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)" << endl;
+        cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)\n" << endl;
     }
 
     return 1;
