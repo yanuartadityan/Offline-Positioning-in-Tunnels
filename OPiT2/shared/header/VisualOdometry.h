@@ -24,25 +24,27 @@ public:
     void initParameter();
     void setImagePath(char *pathname);
     void visualodometry();
-    
+
 private:
     cv::Mat cameraMatrix;
 	cv::Mat rVec, tVec;
 	cv::Mat rMat, tMat;
 	cv::Mat cameraPose, cameraPosition;
     cv::Mat E, mask;
-    
+
     char imagePath[100];
-    
+
     void featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2, int vo_method);
+    void featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat mask1, cv::Mat img2, std::vector<cv::Point2f>& points2, cv::Mat mask2, int vo_method);
     void fastDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
     void siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
+    void siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat mask1, cv::Mat img2, std::vector<cv::Point2f>& points2, cv::Mat mask2);
     void surfDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
     void akazeDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
     void fastSiftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2);
     void findPoses(cv::Mat prevImg, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2, int vo_method);
     void drawPoints(cv::Mat img, std::vector<cv::Point2f>& points1, std::vector<cv::Point2f>& points2);
-    
+
     // param
     double imageScale;
     int iterationsCount;
@@ -50,21 +52,21 @@ private:
     double confidence;
     int method;
     int vo_method;
-    
+
     // fast param
     int fast_threshold;
     bool nonMaxSuppression;
-    
+
     // surf param
     int min_hessian;
     int octave_layer;
     double contrast_threshold;
     double edge_threshold;
     double sigma;
-    
+
     // sift param
     float sift_matching_ratio;
-    
+
     // matching param
     float inlier_threshold; // Distance threshold to identify inliers
     float nn_match_ratio;   // Nearest neighbor matching ratio
