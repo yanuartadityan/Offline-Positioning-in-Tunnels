@@ -15,6 +15,7 @@ public:
 
 	static std::vector<double> backprojectRadius(cv::Mat T, cv::Mat K, cv::Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 	static std::vector<double> backproject(cv::Mat T, cv::Mat K, cv::Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+    static std::vector<double> backprojectRadius(cv::Mat T, cv::Mat	K, cv::Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
     static std::vector<double> LinearInterpolation(std::vector<double> bestPoint, cv::Mat origin, cv::Mat vectorPoint);
 
 private:
