@@ -200,7 +200,7 @@ vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint,
     double min_dist_L2;
     double max_dist_L2;
 	double RADIUS = 0.1f;			// meter
-	double THRESHOLD = 0.001f;		// meter
+	double THRESHOLD = 0.01f;		// meter
 	double DELTA_Z;					// meter
 
 	vector<double> bestPoint;
