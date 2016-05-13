@@ -1,3 +1,5 @@
+%% linear interpolation plotting
+
 A = [0,0];
 B = [2,2];
 

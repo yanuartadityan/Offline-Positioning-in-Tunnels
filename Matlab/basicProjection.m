@@ -1,3 +1,4 @@
+%% basic projection
 
 %% point
 point = [3; 3];
@@ -5,7 +6,7 @@ translation = [2; 2];
 theta = 90;
 
 rotationMatrix = [cosd(theta) -sind(theta);
-                  sind(theta)  cosd(theta)];  
+                  sind(theta)  cosd(theta)];
 
 %% new translation
 newPointTransl = translation + point;
@@ -24,7 +25,7 @@ cameraPoint = [143425.6844188932 6394339.576775855 35.996698161994570];
 rvec = [0.9374521391997079, -0.3434782435455127, -0.05662316593745959;
         -0.08260335620060169, -0.06147257392411345, -0.994684778308958;
         0.3381718087811107, 0.9371466368002576, -0.08600005162601933];
-    
+
 % T matrix
 tvec = [2061863.850036867;
         404959.7605953381;
@@ -33,7 +34,7 @@ tvec = [2061863.850036867;
 % C matrix
 K = [1432, 0, 640;
      0, 1432, 480;
-     0, 0, 1];    
+     0, 0, 1];
 
 %% compute world point to pixel point
 worldPoint = [143430.318, 6394363.127, 39.797];
