@@ -57,7 +57,7 @@ int MainWrapper()
 {
     //threadTest();
     ofstream logFile;
-    logFile.open ("logFile.txt");
+    logFile.open ("logFile.txt", std::ios::out);
 
     //Calibration moved to its own class.
     Calibration calib;
@@ -200,12 +200,15 @@ int MainWrapper()
         //                                 << T.at<double>(1,3) << ", "
         //                                 << T.at<double>(2,3) << "]" << endl;
 
-        if (logMode)
+        if (LOGMODE)
         {
-            logFile << "[" << << T.at<double>(0,3) << ", "
-                              << T.at<double>(1,3) << ", "
-                              << T.at<double>(2,3) << "] ";
+            cout << std::fixed << setprecision(4);
+            logFile << std::fixed << setprecision(4)
+                    << "[" << T.at<double>(0,3) << ", "
+                    << T.at<double>(1,3) << ", "
+                    << T.at<double>(2,3) << "] " << std::flush;
         }
+
         // 12. clear
         _1dTemp.clear();
         _2dTemp.clear();
@@ -319,6 +322,22 @@ int MainWrapper()
 
         }
 
+        if (LOGMODE)
+        {
+            // re check T
+            T = solver.getCameraPose().clone();
+
+            logFile << std::fixed << setprecision(4)
+                    << "[" << T.at<double>(0,3) << ", "
+                    << T.at<double>(1,3) << ", "
+                    << T.at<double>(2,3) << "] " << std::flush;;
+
+            logFile << std::fixed << setprecision(4)
+                    << detectedkpts.size()      << " "
+                    << _3dTemp.size()           << " "
+                    << repError/_1dTemp.size()  << "\n" << std::flush;;
+        }
+
         cout << "  avg reprojection error for " << _1dTemp.size() << " points is: " << repError/_1dTemp.size() << " px " << endl;
 
         //increase the idx
@@ -329,6 +348,8 @@ int MainWrapper()
         auto duration1 = duration_cast<milliseconds>( t2 - t1 ).count();
         cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)\n" << endl;
     }
+
+    logFile.close();
 
     return 1;
 }
