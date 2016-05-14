@@ -25,14 +25,14 @@
 #include <chrono>
 #include <mutex>
 
-#define STARTIDX                433
-#define FINISHIDX               533
-#define NUMTHREADS              8
-#define STATICNTASK             480
-#define DRAWKPTS                1
-#define KEYPOINTSUPPERLIM       2400
-#define SEQMODE                 0
-#define LOGMODE                 1
+#define STARTIDX                433             // frame start, it could be the previous frame or the latter one as long it finds a hit with LUT
+#define FINISHIDX               533             // last frame in the sequence
+#define NUMTHREADS              8               // http://stackoverflow.com/questions/1718465/optimal-number-of-threads-per-core
+#define STATICNTASK             480             // only for static task assignments to each threads. 480 tasks for each thread
+#define KEYPOINTSUPPERLIM       2400            // only for static mode and iff the keypoints are just too many
+#define DRAWKPTS                1               // mode for drawing keypoints within cv::Mat input image and save it to .png
+#define SEQMODE                 0               // mode for parallel threads or sequential
+#define LOGMODE                 1               // mode for saving the states into file
 
 using namespace std;
 using namespace cv;
@@ -56,8 +56,13 @@ void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::P
 int MainWrapper()
 {
     //threadTest();
-    ofstream logFile;
-    logFile.open ("logFile.txt", std::ios::out);
+    ofstream logFile, correspondences, correspondencesRefined;
+    
+    //create directory for log
+    char logDir[100] = "log";
+    mkdir(logDir, 0777);
+    
+    logFile.open ("./log/logFile.txt", std::ios::out);
 
     //Calibration moved to its own class.
     Calibration calib;
@@ -82,6 +87,8 @@ int MainWrapper()
     // 3. start the routing and initiate all variables
     char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/out0/";
     char nextimage[100];
+    char poseFileIdx[100];
+    char poseRefinedFileIdx[100];
 
     Mat T, K;
     Point3d _3dcoord;
@@ -90,6 +97,16 @@ int MainWrapper()
     int idx = STARTIDX;
     while (idx < FINISHIDX)
     {
+        // if (LOGMODE)
+        if (LOGMODE)
+        {
+            sprintf(poseFileIdx, "./log/%d-poseFile.txt", idx);
+            sprintf(poseRefinedFileIdx, "./log/%d-poseRefined.txt", idx);
+
+            correspondences.open(poseFileIdx, std::ios::out);
+            correspondencesRefined.open(poseRefinedFileIdx, std::ios::out);
+        }
+
         // start timer
         high_resolution_clock::time_point t1, t2;
         t1 = high_resolution_clock::now();
@@ -179,9 +196,18 @@ int MainWrapper()
         {
             retrieved2D.push_back(Point2d(detectedkpts[matchedIndices[i]].pt.x,detectedkpts[matchedIndices[i]].pt.y));
             retrieved3D.push_back(Point3d(tunnel3D[matchedXYZ[i]].x,tunnel3D[matchedXYZ[i]].y,tunnel3D[matchedXYZ[i]].z));
-            // cout << std::fixed << setprecision(4);
-            // cout << "   pushed {" << detectedkpts[matchedIndices[i]].pt.x << ", " << detectedkpts[matchedIndices[i]].pt.y << "} --> {"
-            //                      << tunnel3D[matchedXYZ[i]].x << ", " << tunnel3D[matchedXYZ[i]].y << ", " << tunnel3D[matchedXYZ[i]].z << "}" << endl;
+
+            if (LOGMODE)
+            {
+               correspondences << std::fixed << setprecision(4)
+                         << "[" << tunnel3D[matchedXYZ[i]].x << ", "
+                                << tunnel3D[matchedXYZ[i]].y << ", "
+                                << tunnel3D[matchedXYZ[i]].z << "] " << std::flush;
+
+               correspondences << std::fixed << setprecision(4)
+                         << "[" << detectedkpts[matchedIndices[i]].pt.x << ", "
+                                << detectedkpts[matchedIndices[i]].pt.y << "]\n" << std::flush;
+            }
         }
 
         // 10. solvePNP using the XYZ
@@ -194,15 +220,8 @@ int MainWrapper()
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
 
-        // print camera pose
-        // cout << std::fixed << setprecision(4);
-        // cout << "initial camera pose [" << T.at<double>(0,3) << ", "
-        //                                 << T.at<double>(1,3) << ", "
-        //                                 << T.at<double>(2,3) << "]" << endl;
-
         if (LOGMODE)
         {
-            cout << std::fixed << setprecision(4);
             logFile << std::fixed << setprecision(4)
                     << "[" << T.at<double>(0,3) << ", "
                     << T.at<double>(1,3) << ", "
@@ -292,6 +311,21 @@ int MainWrapper()
         solver.setWorldPoints(_3dTemp);
         solver.foo(1);
 
+        if (LOGMODE)
+        {
+            for (int i=0; i<_2dTemp.size(); i++)
+            {
+               correspondencesRefined << std::fixed << setprecision(4)
+                                << "["  << _3dTemp[i].x << ", "
+                                        << _3dTemp[i].y << ", "
+                                        << _3dTemp[i].z << "] " << std::flush;
+
+               correspondencesRefined << std::fixed << setprecision(4)
+                                << "["  << _2dTemp[i].x << ", "
+                                        << _2dTemp[i].y << "]\n" << std::flush;
+            }
+        }
+
         // check reprojection error of each backprojected world points
         vector<Point2d> reprojectedPixels;
         projectPoints(_3dTemp,
@@ -310,16 +344,6 @@ int MainWrapper()
             dy = pow(abs(reprojectedPixels[itx].y - detectedkpts[_1dTemp[itx]].pt.y), 2);
 
             repError += sqrt(dx + dy);
-
-            // cout << std::fixed << setprecision(2);
-            // cout << "  project 3D [" << _3dTemp[itx].x << ","
-            //                          << _3dTemp[itx].y << ","
-            //                          << _3dTemp[itx].z << "] -- 2D ["
-            //                             << reprojectedPixels[itx].x << ","
-            //                             << reprojectedPixels[itx].y << "] -- Px ["
-            //                                 << detectedkpts[_1dTemp[itx]].pt.x << ","
-            //                                 << detectedkpts[_1dTemp[itx]].pt.y << "]" << endl;
-
         }
 
         if (LOGMODE)
@@ -330,12 +354,12 @@ int MainWrapper()
             logFile << std::fixed << setprecision(4)
                     << "[" << T.at<double>(0,3) << ", "
                     << T.at<double>(1,3) << ", "
-                    << T.at<double>(2,3) << "] " << std::flush;;
+                    << T.at<double>(2,3) << "] " << std::flush;
 
             logFile << std::fixed << setprecision(4)
                     << detectedkpts.size()      << " "
                     << _3dTemp.size()           << " "
-                    << repError/_1dTemp.size()  << "\n" << std::flush;;
+                    << repError/_1dTemp.size()  << "\n" << std::flush;
         }
 
         cout << "  avg reprojection error for " << _1dTemp.size() << " points is: " << repError/_1dTemp.size() << " px " << endl;
@@ -347,6 +371,13 @@ int MainWrapper()
         t2 = high_resolution_clock::now();
         auto duration1 = duration_cast<milliseconds>( t2 - t1 ).count();
         cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)\n" << endl;
+
+        //close the files
+        if (LOGMODE)
+        {
+           correspondences.close();
+           correspondencesRefined.close();
+        }
     }
 
     logFile.close();
