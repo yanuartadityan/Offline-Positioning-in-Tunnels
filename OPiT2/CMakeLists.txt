@@ -21,5 +21,9 @@ set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -g")
 #add subdirectory
 add_subdirectory (shared)
 add_subdirectory (exec)
+#provide main dedicated for testing pcl
 add_subdirectory (tests-pcl)
+#provide main dedicated for testing visual odometry
 add_subdirectory (tests-vo)
+#provide main dedicated for whole simulation: vo, camera pose, reprojection, pcl
+add_subdirectory (tests-simulation)
