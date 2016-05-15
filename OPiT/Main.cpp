@@ -107,7 +107,7 @@ int main(int argc, char** argv)
 	for (int i = FIRST_INDEX + 1; i <= LAST_INDEX; i++)
 	{
 		//tunnel2D.clear(); tunnel3D.clear();
-		
+
 		begin = std::chrono::high_resolution_clock::now();
 		sprintf(nextimage, "imageSequence\\img_%05d.png", i);
 		cout << "Loading image: " << nextimage << "... ";
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
 		end = std::chrono::high_resolution_clock::now();
 		cout << "Done!\tFound " << descriptors1.rows << " descriptors (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl;
 
-		
+
 
 		// Take the descriptor mat out of our lookup table for the matching
 		Mat tunnelDescriptors;
@@ -133,7 +133,7 @@ int main(int argc, char** argv)
 			tunnelDescriptors.push_back(pair.second);
 			//cout << "pushing back:" << endl << pair.second << endl << endl;
 		}
-		
+
 		begin = std::chrono::high_resolution_clock::now();
 		cout << "Performing matching... ";
 		vector<vector<DMatch> > matches;
@@ -176,7 +176,7 @@ int main(int argc, char** argv)
 		}
 		retrieved2D.clear();
 		retrieved3D.clear();
-		
+
 
 		for (int k = 0; k < matchedIndices.size(); k++)
 		{
@@ -294,7 +294,7 @@ int main(int argc, char** argv)
 					cloud);
 
 				if (bestPoint[0] == 0 || bestPoint[1] == 0 || bestPoint[2] == 0)
-				{	
+				{
 					cout << "Threw away empty projection result!" << endl;
 					continue;
 				}
@@ -326,19 +326,19 @@ int main(int argc, char** argv)
 			}
 		}
 		//END OF BACKPROJECTION
-		
+
 		end = std::chrono::high_resolution_clock::now();
 		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl << endl;
 
 		cout << "Size of our LUT: " << endl << _3dToDescriptorVector.size() << endl;
-		
+
 		/*
 		// Calculate the miss rate
 		Point3d cmp; cmp.x = 0; cmp.y = 0; cmp.z = 0;
 		int misses = 0;
-		
+
 		cout << "All found points: " << endl;
-		
+
 		for (pair<Point3d, Mat> item : _3dToDescriptorVector)
 		{
 			cout << "[" << item.first.x << ", " << item.first.y << ", " << item.first.z << "]" << endl;
@@ -348,7 +348,7 @@ int main(int argc, char** argv)
 		cout << "Number of misses: " << misses << " (" << ((double)misses / _3dToDescriptorVector.size()) * 100 << "%)" << endl;
 		*/
 		cout << "Camera Position:" << endl << solver1.getCameraPosition() << endl;
-		
+
 
 
 		cout << "****************** STARTING OVER ******************" << endl;
@@ -362,7 +362,7 @@ int main(int argc, char** argv)
 	for(Mat pos : solver1.camPositions)
 		cout << setprecision(10) << pos.at<double>(0,0) << " " << pos.at<double>(1, 0) << " " << pos.at<double>(2, 0) << "; ..."<< endl;
 	cout << "];" << endl << endl;
-	
+
 	/*
 	// Skeleton code for iterating through the image sequence
 	while (vc.read(frame2))
@@ -393,8 +393,8 @@ int main(int argc, char** argv)
 	}
 	*/
 
-	
-	
+
+
 
 	return 0;
 }
@@ -423,7 +423,7 @@ vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr clo
 
 	Calibration calib;
 	PnPSolver solver1, solver2;
-	
+
 	FeatureDetection fdetect;
 
 	Mat distCoeffs = calib.getDistortionCoeffs();
@@ -457,14 +457,14 @@ vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr clo
 
 	// This is the image we did manual matching on
 	frame1 = imread("img_00433.png");
-	
+
 	//cout << "Running SURF/SIFT... ";
 	fdetect.siftDetector(frame1, keypoints1);
 	fdetect.siftExtraction(frame1, keypoints1, descriptors1);
 	//cout << "Done!" << endl;
 
 	vector<int> indexingVector;
-	
+
 	for (int i = 0; i < keypoints1.size(); i++)
 	{
 		for (int j = 0; j<imageOne.size(); j++)
@@ -478,12 +478,12 @@ vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr clo
 			}
 		}
 	}
-	
+
 
 	Mat T = solver1.getCameraPose().clone();
 	Mat K = calib.getCameraMatrix();
 	vector<Point2d> imagepoints = solver1.getVoVImagePoints()[0];
-	
+
 	// Create a vector of "workers", each doing a separate backproject calculation.
 	vector<thread> workers;
 
@@ -491,18 +491,18 @@ vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr clo
 	*	For every feature point that we find in our image, we do the backprojection.
 	*/
 	for (int counter = 0; counter < imagepoints.size(); counter++)
-	{	
+	{
 		workers.push_back(thread([&_3dToDescriptorVector,&T, &K, &imagepoints, &cloud, &descriptors1, &indexingVector, counter]()
 		{
 			vector<double> bestPoint = Reprojection::backproject(T, K, imagepoints[counter], cloud);
 
-			
+
 			// Define the 3D coordinate
 			Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
 
 			// Define its descriptor, should have size 1x128
 			Mat desc;
-			
+
 			desc = descriptors1.row( indexingVector[counter] );
 
 
