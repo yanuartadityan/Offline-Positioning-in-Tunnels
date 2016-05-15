@@ -18,19 +18,21 @@
 #include "Reprojection.h"
 
 #include <iostream>
+#include <fstream>
 #include <numeric>
 #include <thread>
 #include <future>
 #include <chrono>
 #include <mutex>
 
-#define STARTIDX                433
-#define FINISHIDX               533
-#define NUMTHREADS              8
-#define SEQMODE                 0
-#define STATICNTASK             480
-#define DRAWKPTS                1
-#define KEYPOINTSUPPERLIM       2400
+#define STARTIDX                433             // frame start, it could be the previous frame or the latter one as long it finds a hit with LUT
+#define FINISHIDX               463             // last frame in the sequence
+#define NUMTHREADS              8               // http://stackoverflow.com/questions/1718465/optimal-number-of-threads-per-core
+#define STATICNTASK             480             // only for static task assignments to each threads. 480 tasks for each thread
+#define KEYPOINTSUPPERLIM       1200            // only for static mode and iff the keypoints are just too many
+#define DRAWKPTS                1               // mode for drawing keypoints within cv::Mat input image and save it to .png
+#define SEQMODE                 0               // mode for parallel threads or sequential
+// #define LOGMODE                 1               // mode for logging, uncomment if not using cmake
 
 using namespace std;
 using namespace cv;
@@ -49,11 +51,26 @@ mutex                  g_mutex;
 
 int tempCount = 0;
 void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile);
-void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int start, int end, int tidx);
+void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
+                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+                int start, int end, int tidx);
 
+// THE MAIN START HERE
 int MainWrapper()
 {
-    //threadTest();
+    //for logging
+    ofstream logFile, logMatrix, correspondences, correspondencesRefined;
+
+    //create directory for log
+    if (LOGMODE)
+    {
+        char logDir[100] = "log";
+        mkdir(logDir, 0777);
+
+        // create a file for logging posiions
+        logFile.open ("./log/logPoses.txt", std::ios::out);
+        logMatrix.open ("./log/logMatrix.txt", std::ios::out);
+    }
 
     //Calibration moved to its own class.
     Calibration calib;
@@ -62,9 +79,13 @@ int MainWrapper()
 
     // 1. load pointcloud
     PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);
-    io::loadPCDFile("cloud-voxelized.pcd", *cloud);
+    io::loadPCDFile("gnistangtunneln-semifull-voxelized.pcd", *cloud);
     std::cerr 	<< "PointCloud before filtering: " << cloud->width * cloud->height
                 << " data points (" << pcl::getFieldsList (*cloud) << ")" << std::endl;
+
+    // prepare the kdtree
+    pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+    kdtree.setInputCloud(cloud);
 
     // 2. prepare the manual correspondences as a lookup table
     char map2Dto3D  [100];
@@ -78,14 +99,27 @@ int MainWrapper()
     // 3. start the routing and initiate all variables
     char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/out0/";
     char nextimage[100];
+    char poseFileIdx[100];
+    char poseRefinedFileIdx[100];
 
     Mat T, K;
     Point3d _3dcoord;
     Mat descTemp;
+    int clearCounter = 0;
 
     int idx = STARTIDX;
     while (idx < FINISHIDX)
     {
+        // init the logging, create a file, two for each frame index. one for initial pose and one for refined (after backprojection)
+        if (LOGMODE)
+        {
+            sprintf(poseFileIdx, "./log/%d-poseFile.txt", idx);
+            sprintf(poseRefinedFileIdx, "./log/%d-poseRefined.txt", idx);
+
+            correspondences.open(poseFileIdx, std::ios::out);
+            correspondencesRefined.open(poseRefinedFileIdx, std::ios::out);
+        }
+
         // start timer
         high_resolution_clock::time_point t1, t2;
         t1 = high_resolution_clock::now();
@@ -99,12 +133,12 @@ int MainWrapper()
         // 4.1 set the ROI (region of interest)
         // this mask is to take only 50% upper part of the image
         Mat img_maskUpperPart = Mat::zeros(img.size(), CV_8U);
-        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows/2));
+        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows*2/5));
         img_roiUpperPart = Scalar(255, 255, 255);
 
         // this mask is to take 25% of the bottom right part of the image
         Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
-        Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows/2, img.cols*2/5, img.rows*2/5));
+        Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows*2/5, img.cols*2/5, img.rows*2/5));
         img_roiRightPart = Scalar(255, 255, 255);
 
         // combine the masks
@@ -175,9 +209,19 @@ int MainWrapper()
         {
             retrieved2D.push_back(Point2d(detectedkpts[matchedIndices[i]].pt.x,detectedkpts[matchedIndices[i]].pt.y));
             retrieved3D.push_back(Point3d(tunnel3D[matchedXYZ[i]].x,tunnel3D[matchedXYZ[i]].y,tunnel3D[matchedXYZ[i]].z));
-            // cout << std::fixed << setprecision(4);
-            // cout << "   pushed {" << detectedkpts[matchedIndices[i]].pt.x << ", " << detectedkpts[matchedIndices[i]].pt.y << "} --> {"
-            //                      << tunnel3D[matchedXYZ[i]].x << ", " << tunnel3D[matchedXYZ[i]].y << ", " << tunnel3D[matchedXYZ[i]].z << "}" << endl;
+
+            // save the initial matched 3D-to-2D correspondences
+            if (LOGMODE)
+            {
+               correspondences << std::fixed << setprecision(4)
+                         << "[" << tunnel3D[matchedXYZ[i]].x << ", "
+                                << tunnel3D[matchedXYZ[i]].y << ", "
+                                << tunnel3D[matchedXYZ[i]].z << "] " << std::flush;
+
+               correspondences << std::fixed << setprecision(4)
+                         << "[" << detectedkpts[matchedIndices[i]].pt.x << ", "
+                                << detectedkpts[matchedIndices[i]].pt.y << "]\n" << std::flush;
+            }
         }
 
         // 10. solvePNP using the XYZ
@@ -190,19 +234,38 @@ int MainWrapper()
         T = solver.getCameraPose().clone();
         K = calib.getCameraMatrix();
 
-        // print camera pose
-        // cout << std::fixed << setprecision(4);
-        // cout << "initial camera pose [" << T.at<double>(0,3) << ", "
-        //                                 << T.at<double>(1,3) << ", "
-        //                                 << T.at<double>(2,3) << "]" << endl;
+        Mat R = solver.getRotationMatrix();
+        Mat t = solver.getTranslationVector();
 
-        // 12. clear
+        // save the initial camera pose for frame-idx
+        if (LOGMODE)
+        {
+            // save the initial camera position
+            logFile << std::fixed << setprecision(4)
+                    << T.at<double>(0,3) << ", "
+                    << T.at<double>(1,3) << ", "
+                    << T.at<double>(2,3) << ", " << std::flush;
+
+            // save the initial Rotation and Translation matrices from PnP solver
+            logMatrix << std::fixed << setprecision(4)
+                      << R.at<double>(0,0) << ", " << R.at<double>(0,1) << ", " << R.at<double>(0,2) << ", "
+                      << R.at<double>(1,0) << ", " << R.at<double>(1,1) << ", " << R.at<double>(1,2) << ", "
+                      << R.at<double>(2,0) << ", " << R.at<double>(2,1) << ", " << R.at<double>(2,2) << ", "
+                      << t.at<double>(0)   << ", " << t.at<double>(1)   << ", " << t.at<double>(2)   << ", " << std::flush;
+        }
+
+        // 12. clear, timewindow for LUT is 5 frames
+        if (!clearCounter && (clearCounter % 5 == 0))
+        {
+            tunnel3D.clear();
+            tunnelDescriptor.release();
+        }
+
         _1dTemp.clear();
         _2dTemp.clear();
         _3dTemp.clear();
-        tunnel3D.clear();
-        tunnelDescriptor.release();
 
+        // 13. backprojecting all keypoints to the cloud
         if (SEQMODE)
         {
             vector<double> bestPoint{ 0, 0, 0, 1000 };
@@ -213,7 +276,7 @@ int MainWrapper()
                 Point2d queryPoints = Point2d(detectedkpts[counter].pt.x, detectedkpts[counter].pt.y);
 
                 cout << "backprojecting " << "(" << queryPoints.x << "," << queryPoints.y << ")" << "...";
-                bestPoint = Reprojection::backprojectRadius(T, K, queryPoints, cloud);
+                bestPoint = Reprojection::backprojectRadius(T, K, queryPoints, cloud, kdtree);
 
                 // Define the 3D coordinate
                 _3dcoord.x = bestPoint[0];
@@ -259,7 +322,7 @@ int MainWrapper()
                 int end   = (tidx+1)* numtask;
 
                 // spawn threads
-                ts[tidx] = new thread (mpThread, T, K, detectedkpts, descriptor, cloud, start, end, tidx);
+                ts[tidx] = new thread (mpThread, T, K, detectedkpts, descriptor, cloud, kdtree, start, end, tidx);
             }
 
             for (int tidx = 0; tidx < NUMTHREADS; tidx ++)
@@ -270,7 +333,7 @@ int MainWrapper()
             cout << "  succesfully backproject " << _3dTemp.size() << " 3d points" << endl;
         }
 
-        //redo the pnp solver
+        // 14. redo the pnp solver, now using all found 3D points
         cout << "  now solving again using " << _2dTemp.size() << " keypoints ";
         cout << "and 3d correspondences" << endl;
 
@@ -279,7 +342,7 @@ int MainWrapper()
         solver.setWorldPoints(_3dTemp);
         solver.foo(1);
 
-        // check reprojection error of each backprojected world points
+        // 15. check reprojection error of each backprojected world points
         vector<Point2d> reprojectedPixels;
         projectPoints(_3dTemp,
                       solver.getRotationMatrix(),
@@ -297,28 +360,69 @@ int MainWrapper()
             dy = pow(abs(reprojectedPixels[itx].y - detectedkpts[_1dTemp[itx]].pt.y), 2);
 
             repError += sqrt(dx + dy);
+        }
 
-            // cout << std::fixed << setprecision(2);
-            // cout << "  project 3D [" << _3dTemp[itx].x << ","
-            //                          << _3dTemp[itx].y << ","
-            //                          << _3dTemp[itx].z << "] -- 2D ["
-            //                             << reprojectedPixels[itx].x << ","
-            //                             << reprojectedPixels[itx].y << "] -- Px ["
-            //                                 << detectedkpts[_1dTemp[itx]].pt.x << ","
-            //                                 << detectedkpts[_1dTemp[itx]].pt.y << "]" << endl;
+        // save the refined initial camera pose for frame-idx
+        if (LOGMODE)
+        {
+            // save the 3D-to-2D correspondences
+            for (int i=0; i<_2dTemp.size(); i++)
+            {
+                correspondencesRefined << std::fixed << setprecision(4)
+                << "["  << _3dTemp[i].x << ", "
+                << _3dTemp[i].y << ", "
+                << _3dTemp[i].z << "] " << std::flush;
 
+                correspondencesRefined << std::fixed << setprecision(4)
+                << "["  << _2dTemp[i].x << ", "
+                << _2dTemp[i].y << "]\n" << std::flush;
+            }
+
+            // save the refined vehicle position, num of keypoints, num of backprojected points and reprojection errror
+            T = solver.getCameraPose().clone();
+
+            logFile << std::fixed << setprecision(4)
+                    << T.at<double>(0,3) << ", "
+                    << T.at<double>(1,3) << ", "
+                    << T.at<double>(2,3) << ", " << std::flush;
+
+            logFile << std::fixed << setprecision(4)
+                    << detectedkpts.size()      << ", "
+                    << _3dTemp.size()           << ", "
+                    << repError/_1dTemp.size()  << "\n" << std::flush;      // end of logPose
+
+            // save the Rotation and Translation matrices
+            R = solver.getRotationMatrix();
+            t = solver.getTranslationVector();
+
+            logMatrix << std::fixed << setprecision(4)
+                      << R.at<double>(0,0) << ", " << R.at<double>(0,1) << ", " << R.at<double>(0,2) << ", "
+                      << R.at<double>(1,0) << ", " << R.at<double>(1,1) << ", " << R.at<double>(1,2) << ", "
+                      << R.at<double>(2,0) << ", " << R.at<double>(2,1) << ", " << R.at<double>(2,2) << ", "
+                      // end of logMatrix
+                      << t.at<double>(0)   << ", " << t.at<double>(1)   << ", " << t.at<double>(2)   << "\n" << std::flush;
         }
 
         cout << "  avg reprojection error for " << _1dTemp.size() << " points is: " << repError/_1dTemp.size() << " px " << endl;
 
-        //increase the idx
-        idx++;
-
-        //report the exec
+        // 16. report the exec
         t2 = high_resolution_clock::now();
         auto duration1 = duration_cast<milliseconds>( t2 - t1 ).count();
         cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)\n" << endl;
+
+        //close the files
+        if (LOGMODE)
+        {
+           correspondences.close();
+           correspondencesRefined.close();
+        }
+
+        // 17. end of the frame processing, go to next frame and increase the clear LUT counter
+        idx++;
+        clearCounter++;
     }
+
+    logFile.close();
 
     return 1;
 }
@@ -366,14 +470,16 @@ void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile)
 
 }
 
-void mpThread (Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int start, int end, int tidx)
+void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
+                pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+                int start, int end, int tidx)
 {
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
 
     for (int i=start; i<end; i+=4)
     {
-        temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud);
+        temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
 
         // Define the 3D coordinate
         _mp3dcoord.x = temp[0];
