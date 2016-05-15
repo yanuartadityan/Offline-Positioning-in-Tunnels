@@ -16,7 +16,7 @@ int main ()
     // load pcl
     PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);
     PointCloud<PointXYZ>::Ptr cloudFiltered(new PointCloud<PointXYZ>);
-    io::loadPCDFile("cloud-entrance.pcd", *cloud);
+    io::loadPCDFile("gnistangtunneln-semifull.pcd", *cloud);
 
     // downsample
     PCLCloudSearch::VoxelizeCloud (cloud, cloudFiltered);
