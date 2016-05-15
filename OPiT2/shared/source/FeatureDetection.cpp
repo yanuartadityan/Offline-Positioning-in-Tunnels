@@ -32,12 +32,12 @@ FeatureDetection::FeatureDetection()
 	// surf
 	min_hessian = 200;
 	octave_layer = 3;
-	contrast_threshold = 0.01;			// default 0.04, lower value more features
+	contrast_threshold = 0.004;			// default 0.04, lower value more features
 	edge_threshold = 10;				// default 10, higher value more features
 	sigma = 1.6;
 
 	// sift
-	sift_matching_ratio = 0.8;
+	sift_matching_ratio = 0.6;
 
 	//detector
 	fastdetect_ = FastFeatureDetector::create(
