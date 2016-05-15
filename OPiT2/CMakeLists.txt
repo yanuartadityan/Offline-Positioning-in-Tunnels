@@ -14,9 +14,12 @@ include_directories(${PCL_INCLUDE_DIRS} )
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+#compile flag
+add_definitions(-DLOGMODE)
+
 #set compiler flag to C++11
 set (CMAKE_CXX_COMPILER "/usr/bin/clang++")
-set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -g")
+set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -O2")
 
 #add subdirectory
 add_subdirectory (shared)

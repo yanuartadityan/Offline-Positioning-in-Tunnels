@@ -193,14 +193,14 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 }
 
 // using radius instead
-vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
 {
 	double MIN_DIST = 1.0f;			// in pixel
 	double MAX_DIST = 50.0f;		// in pixel
     double min_dist_L2;
     double max_dist_L2;
 	double RADIUS = 0.1f;			// meter
-	double THRESHOLD = 0.01f;		// meter
+	double THRESHOLD = 0.005f;		// meter
 	double DELTA_Z;					// meter
 
 	vector<double> bestPoint;
@@ -237,10 +237,6 @@ vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint,
 
     min_dist_L2 = norm(origin_w, mindist_w, NORM_L2);
     max_dist_L2 = norm(origin_w, maxdist_w, NORM_L2);
-
-    // prepare the kdtree
-    pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-    kdtree.setInputCloud(cloud);
 
     for (double i = min_dist_L2; i < max_dist_L2; i += DELTA_Z)
     {

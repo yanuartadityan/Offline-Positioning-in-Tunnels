@@ -99,9 +99,9 @@ std::vector<double> PCLCloudSearch::FindClosestPointRadius(double x, double y, d
 	if ( kdtree.radiusSearch (searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0 )
 	{
 		bool best_status    = FALSE;
-		
+
 //        std::cout << cloud->points[596225] << std::endl;
-        
+
 		// perform lerp to get the projection of those points on the line
         for (int it = 0; it < pointIdxRadiusSearch.size(); it++)
         {
@@ -135,7 +135,7 @@ std::vector<double> PCLCloudSearch::FindClosestPointRadius(double x, double y, d
 //            std::cout << vectorAP << std::endl;
 //            std::cout << vectorAB << std::endl;
 //            std::cout << output << std::endl;
-            
+
 			// get the square root distance of neigbours after we got the lerp-ed xyz (output)
             double y = cv::norm(searchPointMat, output, cv::NORM_L2);
             double d = sqrt(pow(pointRadiusSquaredDistance[it],2) - pow(y,2));
@@ -186,7 +186,7 @@ void PCLCloudSearch::VoxelizeCloud (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, p
 	// Create the filtering object
     pcl::VoxelGrid<pcl::PointXYZ> voxelized;
 	voxelized.setInputCloud (cloud);
-	voxelized.setLeafSize (0.05f, 0.05f, 0.05f);
+	voxelized.setLeafSize (0.075f, 0.075f, 0.075f);
 	voxelized.filter (*cloudFiltered);
 
 	std::cerr 	<< "PointCloud after filtering: " << cloudFiltered->width * cloudFiltered->height
