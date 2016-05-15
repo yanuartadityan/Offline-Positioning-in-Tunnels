@@ -228,7 +228,7 @@ int MainWrapper()
         cout << "  camera pose at frame-" << idx << ": ";
         solver.setImagePoints(retrieved2D);
         solver.setWorldPoints(retrieved3D);
-        solver.foo(1);
+        solver.run(1);
 
         // 11. reproject all 2D keypoints to 3D
         T = solver.getCameraPose().clone();
@@ -340,7 +340,7 @@ int MainWrapper()
         cout << "  refined pose at frame-" << idx << ": ";
         solver.setImagePoints(_2dTemp);
         solver.setWorldPoints(_3dTemp);
-        solver.foo(1);
+        solver.run(1);
 
         // 15. check reprojection error of each backprojected world points
         vector<Point2d> reprojectedPixels;
