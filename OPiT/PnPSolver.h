@@ -31,7 +31,7 @@ public:
 
 	void setVoVImagePoints();
 	std::vector< std::vector<cv::Point2d> > getVoVImagePoints();
-	
+
 	int run(int verbal);
 
 	std::vector<cv::Mat> camPositions;
@@ -39,7 +39,7 @@ public:
 	cv::Mat R, t;
 
 private:
-	
+
 	std::vector<cv::Point2d> imagePoints, imagePoints2;
 	std::vector<cv::Point3d> worldPoints;
 	std::vector<std::vector<cv::Point2d> > VoVImagePoints;

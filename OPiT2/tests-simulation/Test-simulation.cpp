@@ -25,8 +25,9 @@
 #include <chrono>
 #include <mutex>
 
-#define STARTIDX                433             // frame start, it could be the previous frame or the latter one as long it finds a hit with LUT
-#define FINISHIDX               463             // last frame in the sequence
+#define STARTIDX                435             // frame start, it could be the previous frame or the latter one as long it finds a hit with LUT
+#define FINISHIDX               475             // last frame in the sequence
+#define SLIDINGWINDOWSIZE       3               // number of frames for sliding window, both LUT window and Bundle Adjustment
 #define NUMTHREADS              8               // http://stackoverflow.com/questions/1718465/optimal-number-of-threads-per-core
 #define STATICNTASK             480             // only for static task assignments to each threads. 480 tasks for each thread
 #define KEYPOINTSUPPERLIM       1200            // only for static mode and iff the keypoints are just too many
@@ -46,6 +47,7 @@ vector<Point3d>        tunnel3D;
 vector<Point3d>        _3dTemp;             // found 3d world points
 vector<Point2d>        _2dTemp;             // corresponding 2d pixels
 vector<int>            _1dTemp;             // corresponding indices relative to the query set
+vector<int>            _slidingWindowSize;  // contains of last 5 frame's found 3D points
 Mat                    tunnelDescriptor;
 mutex                  g_mutex;
 
@@ -56,7 +58,7 @@ void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
                 int start, int end, int tidx);
 
 // THE MAIN START HERE
-int MainWrapper()
+int main (int argc, char *argv[])
 {
     //for logging
     ofstream logFile, logMatrix, correspondences, correspondencesRefined;
@@ -255,10 +257,26 @@ int MainWrapper()
         }
 
         // 12. clear, timewindow for LUT is 5 frames
-        if (!clearCounter && (clearCounter % 5 == 0))
+        if ((clearCounter != 0) && (clearCounter % SLIDINGWINDOWSIZE == 0))
         {
-            tunnel3D.clear();
+            Mat temp;
+
+            // erase tunnel3D
+            for (int i=0; i < _slidingWindowSize[0]; i++)
+                tunnel3D.erase(tunnel3D.begin());
+
+            // copy the remaining last windowsize-1 descriptors in a temporary place
+            if (temp.rows != 0)
+                temp.release();
+
+            for (int i=_slidingWindowSize[0]; i < tunnelDescriptor.rows; i++)
+                temp.push_back(tunnelDescriptor.row(i));
+
+            // release the descriptor
             tunnelDescriptor.release();
+
+            // copy back it again
+            tunnelDescriptor = temp.clone();
         }
 
         _1dTemp.clear();
@@ -331,6 +349,9 @@ int MainWrapper()
             }
 
             cout << "  succesfully backproject " << _3dTemp.size() << " 3d points" << endl;
+
+            // add found 3D points into 5 frames sliding window
+            _slidingWindowSize.push_back(_3dTemp.size());
         }
 
         // 14. redo the pnp solver, now using all found 3D points
@@ -424,7 +445,7 @@ int MainWrapper()
 
     logFile.close();
 
-    return 1;
+    return 0;
 }
 
 void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile)
@@ -467,7 +488,6 @@ void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile)
     cv::FileStorage lstorage(mapKeypointsFile, cv::FileStorage::READ);
     lstorage["img"] >> tunnelDescriptor;
     lstorage.release();
-
 }
 
 void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
