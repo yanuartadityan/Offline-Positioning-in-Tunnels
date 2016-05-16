@@ -140,7 +140,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 	*/
 	for (double i = MIN_DIST; i < MAX_DIST; i += DELTA_Z)
 	{
-		cout << endl << "Trying on " << i << endl << endl;
+		//cout << endl << "Trying on " << i << endl << endl;
 		/*
 		*	Take the image coordinates (X and Y) of the feature point,
 		*		together with i which represents going "one step further" on the ray.
@@ -190,14 +190,14 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		{
 			// return the lerp
             bestPoint = LinearInterpolation (newPoint, origin_w, p_);
-			cout << "bestPoint found on " << i << " The distance was " << newPoint[3] << endl;
+			//cout << "bestPoint found on " << i << " The distance was " << newPoint[3] << endl;
 			break;
 		}
-		cout << "No bestPoint found on " << i << " The distance was " << newPoint[3] << endl;
+		//cout << "No bestPoint found on " << i << " The distance was " << newPoint[3] << endl;
 		if (newPoint[3] > MAX_DIST)
 			break;
 
-		i = LinearInterpolation(newPoint, origin_w, p_)[2] + 0.5;
+		//i = LinearInterpolation(newPoint, origin_w, p_)[2] + 0.5;
 		
 	}
 

@@ -37,7 +37,7 @@ using namespace cv;
 const int NR_OF_FRAMES = 5;
 const int FIRST_INDEX = 433, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
 
-const bool PAR_MODE = false;
+const bool PAR_MODE = true;
 
 std::mutex global_mutex;
 
@@ -55,6 +55,16 @@ int areSame(int index, double x, double y, double xx, double yy)
 	else
 		return false;
 }
+
+
+void calcBestPoint(vector< pair<Point3d, Mat> > *_3dToDescriptorVector,
+	Mat T,
+	Mat K,
+	vector<KeyPoint> keypoints1,
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+	Mat descriptors1,
+	int counter);
+
 
 void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile);
 vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
@@ -208,6 +218,13 @@ int main(int argc, char** argv)
 		//if(i % 5 == 0)
 		//	_3dToDescriptorVector.clear();
 
+
+
+
+
+
+
+
 		begin = std::chrono::high_resolution_clock::now();
 		cout << "Performing backprojection... ";
 		/*
@@ -222,57 +239,15 @@ int main(int argc, char** argv)
 
 				// We create one worker for each keypoint.
 				// The order in which they push their results into the look up table does not matter.
-				workers.push_back(thread([&_3dToDescriptorVector, &T, &K, &keypoints1, &cloud, &descriptors1, counter]()
-				{
-					vector<double> bestPoint = Reprojection::backproject(
-						T,
-						K,
-						Point2d(keypoints1[counter].pt.x, keypoints1[counter].pt.y),
-						cloud);
-
-					if (bestPoint[0] == 0 && bestPoint[1] == 0 && bestPoint[2] == 0)
-						return;
-					//cout << setprecision(15);
-					//cout << "*****************************" << endl;
-					//cout << "Seaching for image point\t" << imagepoints[counter] << endl << endl;
-					//cout << "The best point found:" << endl
-					//	<< "X = \t" << bestPoint[0] << endl
-					//	<< "Y = \t" << bestPoint[1] << endl
-					//	<< "Z = \t" << bestPoint[2] << endl
-					//	<< "DIST = \t" << bestPoint[3] << endl;
-					//cout << "*****************************\n\n\n\n\n";
-
-					/*
-					*	Update the Look Up Table for what descriptor belongs to which image point
-					*
-					*	_3dToDescriptorMap.first[0]  == 3D coordinates vector
-					*
-					*	_3dToDescriptorVector[i].first.x == X
-					*	_3dToDescriptorVector[i].first.y == Y
-					*	_3dToDescriptorVector[i].first.z == Z
-					*
-					*	_3dToDescriptorVector[i].second == its descriptor
-					*/
-					// Define the 3D coordinate
-					Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
-
-
-
-					// Define its descriptor, should have size 1x128
-					Mat desc;
-					if (counter > descriptors1.rows)
-						return;
-					desc = descriptors1.row(counter);
-
-					// Vectors are not thread safe, make sure only one thread at a time access it.
-					global_mutex.lock();
-					//cout << "thread " << this_thread::get_id() << " found point " << endl;
-					// Push the pair into the lookup table
-					_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
-					//tunnel3D.push_back(_3dcoord);
-					//tunnelDescriptor.push_back(descriptors1.row(counter));
-					global_mutex.unlock();
-				}));
+				workers.push_back(
+						thread( &calcBestPoint,
+								&_3dToDescriptorVector,
+								T,
+								K,
+								keypoints1,
+								cloud,
+								descriptors1,
+								counter));
 			}
 			// Join acts as a "wall", so that all threads finish before the main thread continues.
 			for (int i = 0; i < workers.size(); i++)
@@ -282,6 +257,11 @@ int main(int argc, char** argv)
 					workers[i].join();
 			}
 		}
+
+
+
+
+
 		else		// RUN IN SEQUENTIAL MODE INSTEAD
 		{
 			cout << "Running singlethreaded..." << endl;
@@ -332,6 +312,20 @@ int main(int argc, char** argv)
 
 		cout << "Size of our LUT: " << endl << _3dToDescriptorVector.size() << endl;
 		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		/*
 		// Calculate the miss rate
 		Point3d cmp; cmp.x = 0; cmp.y = 0; cmp.z = 0;
@@ -398,12 +392,6 @@ int main(int argc, char** argv)
 
 	return 0;
 }
-
-
-
-
-
-
 
 
 
@@ -554,6 +542,8 @@ string type2str(int type) {
 }
 
 
+
+
 void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile)
 {
 	// load descriptor
@@ -595,4 +585,66 @@ void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile)
 	lstorage["img"] >> tunnelDescriptor;
 	lstorage.release();
 
+}
+
+
+void calcBestPoint( vector< pair<Point3d, Mat> > *_3dToDescriptorVector,
+					Mat T, 
+					Mat K, 
+					vector<KeyPoint> keypoints1,
+					pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+					Mat descriptors1, 
+					int counter)
+{
+	//vector<double> bestPoint = Reprojection::backproject(
+	//	T,
+	//	K,
+	//	Point2d(keypoints1[counter].pt.x, keypoints1[counter].pt.y),
+	//	cloud);
+
+	Point2d queryPoints = Point2d(keypoints1[counter].pt.x, keypoints1[counter].pt.y);
+	vector<double> bestPoint = Reprojection::backprojectRadius(T, K, queryPoints, cloud);
+
+	if (bestPoint[0] == 0 && bestPoint[1] == 0 && bestPoint[2] == 0)
+		return;
+	//cout << setprecision(15);
+	//cout << "*****************************" << endl;
+	//cout << "Seaching for image point\t" << imagepoints[counter] << endl << endl;
+	//cout << "The best point found:" << endl
+	//	<< "X = \t" << bestPoint[0] << endl
+	//	<< "Y = \t" << bestPoint[1] << endl
+	//	<< "Z = \t" << bestPoint[2] << endl
+	//	<< "DIST = \t" << bestPoint[3] << endl;
+	//cout << "*****************************\n\n\n\n\n";
+
+	/*
+	*	Update the Look Up Table for what descriptor belongs to which image point
+	*
+	*	_3dToDescriptorMap.first[0]  == 3D coordinates vector
+	*
+	*	_3dToDescriptorVector[i].first.x == X
+	*	_3dToDescriptorVector[i].first.y == Y
+	*	_3dToDescriptorVector[i].first.z == Z
+	*
+	*	_3dToDescriptorVector[i].second == its descriptor
+	*/
+	// Define the 3D coordinate
+	Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
+
+
+
+	// Define its descriptor, should have size 1x128
+	Mat desc;
+	if (counter > descriptors1.rows)
+		return;
+	desc = descriptors1.row(counter);
+
+	// Vectors are not thread safe, make sure only one thread at a time access it.
+	global_mutex.lock();
+	//cout << "thread " << this_thread::get_id() << " found point " << endl;
+	// Push the pair into the lookup table
+	_3dToDescriptorVector->push_back(make_pair(_3dcoord, desc));
+	//tunnel3D.push_back(_3dcoord);
+	//tunnelDescriptor.push_back(descriptors1.row(counter));
+	global_mutex.unlock();
 }
