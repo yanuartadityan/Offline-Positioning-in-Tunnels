@@ -287,20 +287,18 @@ void VO::siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
 
     matcher.knnMatch(descriptor1, descriptor2, matches, 200);  // Find two nearest matches
 
-      for (int i = 0; i < matches.size(); ++i)
-      {
-          DMatch first = matches[i][0];
-          float dist1 = matches[i][0].distance;
-          float dist2 = matches[i][1].distance;
-    
-          if(dist1 < 0.6 * dist2)
-          {
-              matched1.push_back(keypoints1[first.queryIdx]);
-              matched2.push_back(keypoints2[first.trainIdx]);
-          }
-      }
+     for (int i = 0; i < matches.size(); ++i)
+     {
+         DMatch first = matches[i][0];
+         float dist1 = matches[i][0].distance;
+         float dist2 = matches[i][1].distance;
 
-     
+         if(dist1 < 0.6 * dist2)
+         {
+             matched1.push_back(keypoints1[first.queryIdx]);
+             matched2.push_back(keypoints2[first.trainIdx]);
+         }
+     }
 
     // convert
     cv::KeyPoint::convert(matched1, points1, vector<int>());
