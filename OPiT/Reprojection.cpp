@@ -114,12 +114,12 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 *	x = K * [R|t] * X
 *
 */
-vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
 {
     const double THRESHOLD = 0.1;
     const double MIN_DIST = 15.0;
-    const double MAX_DIST = 25.0;
-    const double DELTA_Z = 0.5;
+    const double MAX_DIST = 50.0;
+    const double DELTA_Z = 0.1;
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
@@ -174,7 +174,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
          *		for finding the closest neighbour (point) in the point cloud.
          */
         newX = p_.at<double>(0, 0);	newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
-        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud);
+        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud, kdtree);
 
         /*
          *	As soon as we find a "good enough" point, return it,
@@ -183,8 +183,8 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
         if (newPoint[3] < THRESHOLD)
         {
             // return the lerp
-            bestPoint = LinearInterpolation (newPoint, origin_w, p_);
-
+            //bestPoint = LinearInterpolation (newPoint, origin_w, p_);
+			bestPoint = { newX,newY,newZ };
             break;
         }
     }
