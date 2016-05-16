@@ -287,45 +287,16 @@ void VO::siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
 
     matcher.knnMatch(descriptor1, descriptor2, matches, 200);  // Find two nearest matches
 
-    //  for (int i = 0; i < matches.size(); ++i)
-    //  {
-    //      DMatch first = matches[i][0];
-    //      float dist1 = matches[i][0].distance;
-    //      float dist2 = matches[i][1].distance;
-     //
-    //      if(dist1 < 0.6 * dist2)
-    //      {
-    //          matched1.push_back(keypoints1[first.queryIdx]);
-    //          matched2.push_back(keypoints2[first.trainIdx]);
-    //      }
-    //  }
-
-     //look whether the match is inside a defined area of the image
-     //only 25% of maximum of possible distance
-     double tresholdDist = 0.25 * sqrt(double(imageL.size().height*imageL.size().height + imageL.size().width*imageL.size().width));
-
-     vector<DMatch> good_matches2;
-     good_matches2.reserve(matches.size());
-     for (size_t i = 0; i < matches.size(); ++i)
+     for (int i = 0; i < matches.size(); ++i)
      {
-         for (int j = 0; j < matches[i].size(); j++)
+         DMatch first = matches[i][0];
+         float dist1 = matches[i][0].distance;
+         float dist2 = matches[i][1].distance;
+
+         if(dist1 < 0.6 * dist2)
          {
-             Point2f from = keypoints1[matches[i][j].queryIdx].pt;
-             Point2f to = keypoints2[matches[i][j].trainIdx].pt;
-
-             //calculate local distance for each possible match
-             double dist = sqrt((from.x - to.x) * (from.x - to.x) + (from.y - to.y) * (from.y - to.y));
-
-             //save as best match if local distance is in specified area and on same height
-             if (dist < tresholdDist && abs(from.y-to.y)<5)
-             {
-                 good_matches2.push_back(matches[i][j]);
-
-                // get the output
-                matched1.push_back(keypoints1[])
-
-                j = matches[i].size();
-             }
+             matched1.push_back(keypoints1[first.queryIdx]);
+             matched2.push_back(keypoints2[first.trainIdx]);
          }
      }
 

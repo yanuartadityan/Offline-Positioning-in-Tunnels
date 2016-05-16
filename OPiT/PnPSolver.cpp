@@ -50,23 +50,23 @@ int PnPSolver::run(int verbalOutput)
 	Calibration calib;
 
 	Mat cameraMatrix = calib.getCameraMatrix();
-	
-	
-	
-	
+
+
+
+
 	/*
 	recoverPose() described here: http://docs.opencv.org/3.0-beta/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#recoverpose
 	*/
-	//recoverPose(
-	//	essentialMatrix,
-	//	VoVImagePoints[0],
-	//	VoVImagePoints[1],
-	//	R,
-	//	t,
-	//	cameraMatrix.at<double>(0, 0),
-	//	Point2d(cameraMatrix.at<double>(0, 2), cameraMatrix.at<double>(1, 2)),
-	//	mask
-	//	);
+	// recoverPose(
+	// 	essentialMatrix,
+	// 	VoVImagePoints[0],
+	// 	VoVImagePoints[1],
+	// 	R,
+	// 	t,
+	// 	cameraMatrix.at<double>(0, 0),
+	// 	Point2d(cameraMatrix.at<double>(0, 2), cameraMatrix.at<double>(1, 2)),
+	// 	mask
+	// 	);
 
 
 	Mat inliers;
@@ -94,12 +94,11 @@ int PnPSolver::run(int verbalOutput)
 		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 									//						of the rotation and translation vectors, respectively, and further optimizes them.
 		1000,						// ITERATIONS COUNT, number of iterations
-		10,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
+		5,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
 		0.99,						// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
-		CV_ITERATIVE);				// FLAGS, method for solving a PnP problem.
-
+		SOLVEPNP_EPNP);				// FLAGS, method for solving a PnP problem.
 
 	//Create the rotation matrix from the vector created above, by using the "Rodrigues"
 	rMat.create(3, 3, DataType<double>::type);
@@ -210,29 +209,36 @@ int PnPSolver::run(int verbalOutput)
 	*/
 
 
-	if (verbalOutput)
+	if(verbalOutput)
 	{
-		cout << endl << "***************************" << endl;
+//		cout << endl << "***********************************************" << endl << endl;
+//
+//		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
+//
+//		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
+//
+//		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
+//
+//		cout << "R =" << endl << rMat << endl << endl;
+//
+//		cout << "T =" << endl << tMat << endl << endl;
+//
+//		cout << "t =" << endl << tVec << endl << endl;
+//
+		// cout << "Camera Pose = [" << cameraPose.at<double>(0,3) << ", "
+        //                           << cameraPose.at<double>(1,3) << ", "
+        //                           << cameraPose.at<double>(2,3) << "]" << endl;
 
-		cout << "Essential Matrix = " << endl << getEssentialMatrix() << endl << endl;
+		cout << "[" << cameraPose.at<double>(0,3) << ", "
+								  << cameraPose.at<double>(1,3) << ", "
+								  << cameraPose.at<double>(2,3) << "]" << endl;
 
-		cout << "Fundamental Matrix = " << endl << getFundamentalMatrix() << endl << endl;
+//		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
+//									   << cameraPosition.at<double>(1) << ", "
+//									   << cameraPosition.at<double>(2) << "]" << endl;
 
-		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
+#include <iomanip>
 
-		cout << "R =" << endl << rMat << endl << endl;
-
-		cout << "T =" << endl << tMat << endl << endl;
-
-		cout << "t =" << endl << tVec << endl << endl;
-
-		cout << "Camera Pose = " << endl << cameraPose << endl << endl;
-		cout << endl << "***********************************************" << endl << endl;
-
-		cout<< setprecision(15)
-			<< "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
-									   << cameraPosition.at<double>(1) << ", "
-									   << cameraPosition.at<double>(2) << "]" << endl;
 
 
 //		cout << endl << "***********************************************" << endl << endl;
