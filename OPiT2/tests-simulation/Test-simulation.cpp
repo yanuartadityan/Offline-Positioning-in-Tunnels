@@ -277,6 +277,7 @@ int main (int argc, char *argv[])
 //            tunnelDescriptor = temp.clone();
 //        }
 
+        tunnel2D.clear();
         tunnel3D.clear();
         tunnelDescriptor.release();
 
