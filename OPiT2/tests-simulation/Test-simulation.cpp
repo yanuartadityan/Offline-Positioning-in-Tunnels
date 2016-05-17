@@ -25,12 +25,11 @@
 #include <chrono>
 #include <mutex>
 
-#define STARTIDX                435             // frame start, it could be the previous frame or the latter one as long it finds a hit with LUT
-#define FINISHIDX               475             // last frame in the sequence
-#define SLIDINGWINDOWSIZE       3               // number of frames for sliding window, both LUT window and Bundle Adjustment
+#define STARTIDX                433             // frame start, it could be the previous frame or the latter one as long it finds a hit with LUT
+#define FINISHIDX               523             // last frame in the sequence
+#define SLIDINGWINDOWSIZE       1               // number of frames for sliding window, both LUT window and Bundle Adjustment
 #define NUMTHREADS              8               // http://stackoverflow.com/questions/1718465/optimal-number-of-threads-per-core
 #define STATICNTASK             480             // only for static task assignments to each threads. 480 tasks for each thread
-#define KEYPOINTSUPPERLIM       1200            // only for static mode and iff the keypoints are just too many
 #define DRAWKPTS                1               // mode for drawing keypoints within cv::Mat input image and save it to .png
 #define SEQMODE                 0               // mode for parallel threads or sequential
 // #define LOGMODE                 1               // mode for logging, uncomment if not using cmake
@@ -41,7 +40,7 @@ using namespace pcl;
 using namespace std::chrono;
 
 // global variable for tunnel GPS mapping
-//unordered_map<Mat, Point3f> tunnelLut;
+// unordered_map<Mat, Point3f> tunnelLut;
 vector<Point2d>        tunnel2D;
 vector<Point3d>        tunnel3D;
 vector<Point3d>        _3dTemp;             // found 3d world points
@@ -51,7 +50,6 @@ vector<int>            _slidingWindowSize;  // contains of last 5 frame's found 
 Mat                    tunnelDescriptor;
 mutex                  g_mutex;
 
-int tempCount = 0;
 void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile);
 void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
@@ -135,20 +133,20 @@ int main (int argc, char *argv[])
         // 4.1 set the ROI (region of interest)
         // this mask is to take only 50% upper part of the image
         Mat img_maskUpperPart = Mat::zeros(img.size(), CV_8U);
-        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows*2/5));
+        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows*4/5));
         img_roiUpperPart = Scalar(255, 255, 255);
 
         // this mask is to take 25% of the bottom right part of the image
-        Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
-        Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows*2/5, img.cols*2/5, img.rows*2/5));
-        img_roiRightPart = Scalar(255, 255, 255);
+        // Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
+        // Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows*2/5, img.cols*2/5, img.rows*2/5));
+        // img_roiRightPart = Scalar(255, 255, 255);
 
         // combine the masks
-        Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
+        // Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
 
         // 5. perform sift feature detection and get kpt_i
         vector<KeyPoint> detectedkpts;
-        fdetect.siftDetector(img, detectedkpts, img_combinedMask);
+        fdetect.siftDetector(img, detectedkpts, img_maskUpperPart);
 
         // 6. perform sift feature extraction and get desc_i
         Mat descriptor;
@@ -189,7 +187,7 @@ int main (int argc, char *argv[])
             auto dist1 = matches[i][0].distance;
             auto dist2 = matches[i][1].distance;
 
-            // based on lowe's it's 0.8 * dist, however we're using 0.6 for now
+            // based on lowe's it's 0.8 * dist, however we're using 0.7 for now
             if(dist1 < fdetect.getSiftMatchingRatio() * dist2)
             {
                 matchedIndices.push_back(first.trainIdx);
@@ -216,13 +214,13 @@ int main (int argc, char *argv[])
             if (LOGMODE)
             {
                correspondences << std::fixed << setprecision(4)
-                         << "[" << tunnel3D[matchedXYZ[i]].x << ", "
-                                << tunnel3D[matchedXYZ[i]].y << ", "
-                                << tunnel3D[matchedXYZ[i]].z << "] " << std::flush;
+                               << tunnel3D[matchedXYZ[i]].x << ", "
+                               << tunnel3D[matchedXYZ[i]].y << ", "
+                               << tunnel3D[matchedXYZ[i]].z << ", " << std::flush;
 
                correspondences << std::fixed << setprecision(4)
-                         << "[" << detectedkpts[matchedIndices[i]].pt.x << ", "
-                                << detectedkpts[matchedIndices[i]].pt.y << "]\n" << std::flush;
+                               << detectedkpts[matchedIndices[i]].pt.x << ", "
+                               << detectedkpts[matchedIndices[i]].pt.y << "\n" << std::flush;
             }
         }
 
@@ -257,31 +255,30 @@ int main (int argc, char *argv[])
         }
 
         // 12. clear, timewindow for LUT is 5 frames
-        if ((clearCounter != 0) && (clearCounter % SLIDINGWINDOWSIZE == 0))
-        {
-            Mat temp;
+//        if ((clearCounter != 0) && (clearCounter % SLIDINGWINDOWSIZE == 0))
+//        {
+//            Mat temp;
+//
+//            // erase tunnel3D
+//            for (int i=0; i < _slidingWindowSize[0]; i++)
+//                tunnel3D.erase(tunnel3D.begin());
+//
+//            // copy the remaining last windowsize-1 descriptors in a temporary place
+//            if (temp.rows != 0)
+//                temp.release();
+//
+//            for (int i=_slidingWindowSize[0]; i < tunnelDescriptor.rows; i++)
+//                temp.push_back(tunnelDescriptor.row(i));
+//
+//            // release the descriptor
+//            tunnelDescriptor.release();
+//
+//            // copy back it again
+//            tunnelDescriptor = temp.clone();
+//        }
 
-            // erase tunnel3D
-            for (int i=0; i < _slidingWindowSize[0]; i++)
-                tunnel3D.erase(tunnel3D.begin());
-
-            // copy the remaining last windowsize-1 descriptors in a temporary place
-            if (temp.rows != 0)
-                temp.release();
-
-            for (int i=_slidingWindowSize[0]; i < tunnelDescriptor.rows; i++)
-                temp.push_back(tunnelDescriptor.row(i));
-
-            // release the descriptor
-            tunnelDescriptor.release();
-
-            // copy back it again
-            tunnelDescriptor = temp.clone();
-        }
-
-        _1dTemp.clear();
-        _2dTemp.clear();
-        _3dTemp.clear();
+        tunnel3D.clear();
+        tunnelDescriptor.release();
 
         // 13. backprojecting all keypoints to the cloud
         if (SEQMODE)
@@ -304,8 +301,7 @@ int main (int argc, char *argv[])
                 // Push the pair into the lookup table if it's not zero
                 if ((_3dcoord.x > 0.0f) && (_3dcoord.y > 0.0f) && (_3dcoord.z > 0.0f))
                 {
-                    tempCount++;
-                    cout << "found a point...(" << tempCount << ") at px-" << counter << endl;
+                    cout << "found a point...(" << ") at px-" << counter << endl;
 
                     // 12. Update the LUT
                     tunnel3D.push_back(_3dcoord);
@@ -328,11 +324,7 @@ int main (int argc, char *argv[])
             int numtask;
 
             // if keypoints are too many
-            if (detectedkpts.size() > KEYPOINTSUPPERLIM)
-                numtask = KEYPOINTSUPPERLIM/NUMTHREADS;
-            // if keypoints are sufficient
-            else
-                numtask = floor(detectedkpts.size()/NUMTHREADS);
+            numtask = floor(detectedkpts.size()/NUMTHREADS);
 
             for (int tidx = 0; tidx < NUMTHREADS; tidx++)
             {
@@ -390,13 +382,13 @@ int main (int argc, char *argv[])
             for (int i=0; i<_2dTemp.size(); i++)
             {
                 correspondencesRefined << std::fixed << setprecision(4)
-                << "["  << _3dTemp[i].x << ", "
-                << _3dTemp[i].y << ", "
-                << _3dTemp[i].z << "] " << std::flush;
+                                       << _3dTemp[i].x << ", "
+                                       << _3dTemp[i].y << ", "
+                                       << _3dTemp[i].z << ", " << std::flush;
 
                 correspondencesRefined << std::fixed << setprecision(4)
-                << "["  << _2dTemp[i].x << ", "
-                << _2dTemp[i].y << "]\n" << std::flush;
+                                       << _2dTemp[i].x << ", "
+                                       << _2dTemp[i].y << "\n" << std::flush;
             }
 
             // save the refined vehicle position, num of keypoints, num of backprojected points and reprojection errror
@@ -431,6 +423,8 @@ int main (int argc, char *argv[])
         auto duration1 = duration_cast<milliseconds>( t2 - t1 ).count();
         cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)\n" << endl;
 
+        // 17. draw succesfully reprojected 2Ds
+
         //close the files
         if (LOGMODE)
         {
@@ -441,6 +435,11 @@ int main (int argc, char *argv[])
         // 17. end of the frame processing, go to next frame and increase the clear LUT counter
         idx++;
         clearCounter++;
+
+        // 18. clear all temporary variables
+        _1dTemp.clear();
+        _2dTemp.clear();
+        _3dTemp.clear();
     }
 
     logFile.close();
@@ -497,9 +496,10 @@ void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
 
-    for (int i=start; i<end; i+=4)
+    for (int i=start; i<end; i++)
     {
-        temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
+        //temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
+        temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
 
         // Define the 3D coordinate
         _mp3dcoord.x = temp[0];
@@ -515,15 +515,12 @@ void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
                 tunnel2D.push_back(Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y));
                 tunnel3D.push_back(_mp3dcoord);
                 tunnelDescriptor.push_back(descriptor.row(i));
-                tempCount++;
-
-                // project again to check the reprojection error
 
                 // For verifying PnP
                 _3dTemp.push_back(_mp3dcoord);
                 _2dTemp.push_back(Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y));
                 _1dTemp.push_back(i);
-                //cout << "      tidx-" << tidx << " - found a point at px-" << i << "(" << tempCount << ")" << endl;
+                //cout << "      tidx-" << tidx << " - found a point at px-" << i << endl;
             }
         }
         // else
