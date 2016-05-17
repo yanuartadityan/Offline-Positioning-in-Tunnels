@@ -15,6 +15,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 //OUR STUFF
 #include "FeatureDetection.h"
@@ -34,10 +35,10 @@
 using namespace std;
 using namespace cv;
 
-const int NR_OF_FRAMES = 5;
+const int NR_OF_FRAMES = 40;
 const int FIRST_INDEX = 433, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
-
-const bool PAR_MODE = false;
+const int NUMBEROFTHREADS = 8;
+const bool PAR_MODE = true;
 
 std::mutex global_mutex;
 
@@ -56,8 +57,22 @@ int areSame(int index, double x, double y, double xx, double yy)
 		return false;
 }
 
+
+void calcBestPoint(
+	vector< pair<Point3d, Mat> >& _3dToDescriptorVector,
+	Mat T,
+	Mat K,
+	vector<KeyPoint> keypoints1,
+	Mat descriptors1,
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+	int start,
+	int end,
+	int threadIndex);
+
+
 void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile);
-vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+//vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree);
 string type2str(int type);
 
 int main(int argc, char** argv)
@@ -73,7 +88,13 @@ int main(int argc, char** argv)
 	//    since the loading takes alot of time.
 	cout << endl << "Loading point cloud... ";
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::io::loadPCDFile("cloud.pcd", *cloud);
+	pcl::io::loadPCDFile("gnistangtunneln-semifull-voxelized.pcd", *cloud);
+    
+
+	//Build the kdtree for searching in the point cloud.
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+	kdtree.setInputCloud(cloud);
+
 	auto end = std::chrono::high_resolution_clock::now();
 	cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms)" << endl << endl;
 
@@ -107,7 +128,7 @@ int main(int argc, char** argv)
 	for (int i = FIRST_INDEX + 1; i <= LAST_INDEX; i++)
 	{
 		//tunnel2D.clear(); tunnel3D.clear();
-
+		
 		begin = std::chrono::high_resolution_clock::now();
 		sprintf(nextimage, "imageSequence\\img_%05d.png", i);
 		cout << "Loading image: " << nextimage << "... ";
@@ -115,16 +136,29 @@ int main(int argc, char** argv)
 		//String filename = "imageSequence\\img_00" + to_string(i) + ".png";
 		//cout << "Loading image: " << filename << "... ";
 		//frame1 = imread(filename);
+
+		// set the RoI (Region of Interest)
+		// this mask is to take only 50% upper part of the image
+		Mat img_maskUpperPart = Mat::zeros(frame1.size(), CV_8U);
+		Mat img_roiUpperPart(img_maskUpperPart, Rect(0, 0, frame1.cols, frame1.rows * 4 / 5));
+		img_roiUpperPart = Scalar(255, 255, 255);
+		
+
 		cout << "Done!" << endl;
 
+
+
+
+
+
 		begin = std::chrono::high_resolution_clock::now();
-		cout << "Running SURF/SIFT... ";
-		fdetect.siftDetector(frame1, keypoints1);
+		cout << "Running SIFT... ";
+		fdetect.siftDetector(frame1, keypoints1, img_maskUpperPart);
 		fdetect.siftExtraction(frame1, keypoints1, descriptors1);
 		end = std::chrono::high_resolution_clock::now();
 		cout << "Done!\tFound " << descriptors1.rows << " descriptors (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl;
 
-
+		
 
 		// Take the descriptor mat out of our lookup table for the matching
 		Mat tunnelDescriptors;
@@ -133,7 +167,7 @@ int main(int argc, char** argv)
 			tunnelDescriptors.push_back(pair.second);
 			//cout << "pushing back:" << endl << pair.second << endl << endl;
 		}
-
+		
 		begin = std::chrono::high_resolution_clock::now();
 		cout << "Performing matching... ";
 		vector<vector<DMatch> > matches;
@@ -168,15 +202,32 @@ int main(int argc, char** argv)
 		vector<Point2d> retrieved2D;
 		vector<Point3d> retrieved3D;
 
+		
+		vector< pair<Point3d, Mat> > tempLUT;
+		vector< pair<Point3d, Mat> >::iterator halfwayItr = _3dToDescriptorVector.begin() + _3dToDescriptorVector.size() / 2;
+		vector< pair<Point3d, Mat> >::iterator beginItr = _3dToDescriptorVector.begin();
 		clearingCounter++;
-		if(clearingCounter % 3 == 0)
+		if(clearingCounter == 5)
 		{
+			cout << "Clearing the LUT..." << endl;
 			clearingCounter = 0;
+
+			tempLUT.insert(tempLUT.end(),
+							make_move_iterator(beginItr),
+							make_move_iterator(halfwayItr));
+			
 			_3dToDescriptorVector.clear();
+
+			_3dToDescriptorVector = move(tempLUT);
+
+			tempLUT.clear();
+
+			cout << "New size of LUT: " << _3dToDescriptorVector.size() << endl;
 		}
+		
 		retrieved2D.clear();
 		retrieved3D.clear();
-
+		
 
 		for (int k = 0; k < matchedIndices.size(); k++)
 		{
@@ -208,6 +259,7 @@ int main(int argc, char** argv)
 		//if(i % 5 == 0)
 		//	_3dToDescriptorVector.clear();
 
+
 		begin = std::chrono::high_resolution_clock::now();
 		cout << "Performing backprojection... ";
 		/*
@@ -216,72 +268,43 @@ int main(int argc, char** argv)
 		if(PAR_MODE)		//RUN THE BACKPROJECTION WITH THREADS IN PARALLELL
 		{
 			cout << "Running multithreaded..." << endl;
-			for (int counter = 0; counter < keypoints1.size(); counter = counter + 10)
+
+			int keypointsPerThread;
+
+			for (int threadIndex = 0; threadIndex < NUMBEROFTHREADS; threadIndex++)
 			{
 				workerCount++;
 
+				int start = threadIndex * keypointsPerThread;
+				int end = (threadIndex + 1) * keypointsPerThread;
+
 				// We create one worker for each keypoint.
 				// The order in which they push their results into the look up table does not matter.
-				workers.push_back(thread([&_3dToDescriptorVector, &T, &K, &keypoints1, &cloud, &descriptors1, counter]()
-				{
-					vector<double> bestPoint = Reprojection::backproject(
-						T,
-						K,
-						Point2d(keypoints1[counter].pt.x, keypoints1[counter].pt.y),
-						cloud);
-
-					if (bestPoint[0] == 0 && bestPoint[1] == 0 && bestPoint[2] == 0)
-						return;
-					//cout << setprecision(15);
-					//cout << "*****************************" << endl;
-					//cout << "Seaching for image point\t" << imagepoints[counter] << endl << endl;
-					//cout << "The best point found:" << endl
-					//	<< "X = \t" << bestPoint[0] << endl
-					//	<< "Y = \t" << bestPoint[1] << endl
-					//	<< "Z = \t" << bestPoint[2] << endl
-					//	<< "DIST = \t" << bestPoint[3] << endl;
-					//cout << "*****************************\n\n\n\n\n";
-
-					/*
-					*	Update the Look Up Table for what descriptor belongs to which image point
-					*
-					*	_3dToDescriptorMap.first[0]  == 3D coordinates vector
-					*
-					*	_3dToDescriptorVector[i].first.x == X
-					*	_3dToDescriptorVector[i].first.y == Y
-					*	_3dToDescriptorVector[i].first.z == Z
-					*
-					*	_3dToDescriptorVector[i].second == its descriptor
-					*/
-					// Define the 3D coordinate
-					Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
-
-
-
-					// Define its descriptor, should have size 1x128
-					Mat desc;
-					if (counter > descriptors1.rows)
-						return;
-					desc = descriptors1.row(counter);
-
-					// Vectors are not thread safe, make sure only one thread at a time access it.
-					global_mutex.lock();
-					//cout << "thread " << this_thread::get_id() << " found point " << endl;
-					// Push the pair into the lookup table
-					_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
-					//tunnel3D.push_back(_3dcoord);
-					//tunnelDescriptor.push_back(descriptors1.row(counter));
-					global_mutex.unlock();
-				}));
+				workers.push_back(
+						thread( &calcBestPoint,
+								ref(_3dToDescriptorVector),
+								T,
+								K,
+								keypoints1,
+								descriptors1,
+								cloud,
+								kdtree,
+								start,
+								end,
+								threadIndex));
 			}
 			// Join acts as a "wall", so that all threads finish before the main thread continues.
-			for (int i = 0; i < workers.size(); i++)
+			for (int l = 0; l < workers.size(); l++)
 			{
-				//cout << "Joining thread #" << workers[i].get_id() << endl;
-				if (workers[i].joinable())
-					workers[i].join();
+				//cout << "Joining thread #" << workers[l].get_id() << endl;
+				if (workers[l].joinable())
+					workers[l].join();
 			}
+			workers.clear();
+
 		}
+
+
 		else		// RUN IN SEQUENTIAL MODE INSTEAD
 		{
 			cout << "Running singlethreaded..." << endl;
@@ -291,10 +314,11 @@ int main(int argc, char** argv)
 					T,
 					K,
 					Point2d(keypoints1[counter].pt.x, keypoints1[counter].pt.y),
-					cloud);
+					cloud,
+					kdtree);
 
 				if (bestPoint[0] == 0 || bestPoint[1] == 0 || bestPoint[2] == 0)
-				{
+				{	
 					cout << "Threw away empty projection result!" << endl;
 					continue;
 				}
@@ -326,19 +350,22 @@ int main(int argc, char** argv)
 			}
 		}
 		//END OF BACKPROJECTION
-
+		
 		end = std::chrono::high_resolution_clock::now();
 		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl << endl;
 
 		cout << "Size of our LUT: " << endl << _3dToDescriptorVector.size() << endl;
+		
+
+
 
 		/*
 		// Calculate the miss rate
 		Point3d cmp; cmp.x = 0; cmp.y = 0; cmp.z = 0;
 		int misses = 0;
-
+		
 		cout << "All found points: " << endl;
-
+		
 		for (pair<Point3d, Mat> item : _3dToDescriptorVector)
 		{
 			cout << "[" << item.first.x << ", " << item.first.y << ", " << item.first.z << "]" << endl;
@@ -348,7 +375,35 @@ int main(int argc, char** argv)
 		cout << "Number of misses: " << misses << " (" << ((double)misses / _3dToDescriptorVector.size()) * 100 << "%)" << endl;
 		*/
 		cout << "Camera Position:" << endl << solver1.getCameraPosition() << endl;
+		
 
+		vector<Point3d> _3dTemp;
+		for (int m = (_3dToDescriptorVector.size() - workerCount); m <= _3dToDescriptorVector.size(); m++)
+		{
+			_3dTemp.push_back(_3dToDescriptorVector[m].first); 
+		}
+
+		// 15. check reprojection error of each backprojected world points
+		/*
+		vector<Point2d> reprojectedPixels;
+		projectPoints(_3dTemp,
+			solver1.getRotationMatrix(),
+			solver1.getTranslationVector(),
+			calib.getCameraMatrix(),
+			calib.getDistortionCoeffs(),
+			reprojectedPixels);
+
+		double repError = 0;
+		for (int itx = 0; itx < _1dTemp.size(); itx++)
+		{
+			double dx, dy;
+
+			dx = pow(abs(reprojectedPixels[itx].x - detectedkpts[_1dTemp[itx]].pt.x), 2);
+			dy = pow(abs(reprojectedPixels[itx].y - detectedkpts[_1dTemp[itx]].pt.y), 2);
+
+			repError += sqrt(dx + dy);
+		}
+		*/
 
 
 		cout << "****************** STARTING OVER ******************" << endl;
@@ -362,7 +417,7 @@ int main(int argc, char** argv)
 	for(Mat pos : solver1.camPositions)
 		cout << setprecision(10) << pos.at<double>(0,0) << " " << pos.at<double>(1, 0) << " " << pos.at<double>(2, 0) << "; ..."<< endl;
 	cout << "];" << endl << endl;
-
+	
 	/*
 	// Skeleton code for iterating through the image sequence
 	while (vc.read(frame2))
@@ -393,8 +448,8 @@ int main(int argc, char** argv)
 	}
 	*/
 
-
-
+	
+	
 
 	return 0;
 }
@@ -406,24 +461,19 @@ int main(int argc, char** argv)
 
 
 
+/*
 
-
-
-
-
-
-
-
-vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
 {
 	Mat frame1;
 	Mat descriptors1, descriptors2;
 	vector<KeyPoint> keypoints1, keypoints2;
 	vector< pair<Point3d, Mat> > _3dToDescriptorVector;
 
+	
 	Calibration calib;
 	PnPSolver solver1, solver2;
-
+	
 	FeatureDetection fdetect;
 
 	Mat distCoeffs = calib.getDistortionCoeffs();
@@ -457,14 +507,14 @@ vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr clo
 
 	// This is the image we did manual matching on
 	frame1 = imread("img_00433.png");
-
+	
 	//cout << "Running SURF/SIFT... ";
 	fdetect.siftDetector(frame1, keypoints1);
 	fdetect.siftExtraction(frame1, keypoints1, descriptors1);
 	//cout << "Done!" << endl;
 
 	vector<int> indexingVector;
-
+	
 	for (int i = 0; i < keypoints1.size(); i++)
 	{
 		for (int j = 0; j<imageOne.size(); j++)
@@ -478,42 +528,26 @@ vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr clo
 			}
 		}
 	}
-
+	
 
 	Mat T = solver1.getCameraPose().clone();
 	Mat K = calib.getCameraMatrix();
 	vector<Point2d> imagepoints = solver1.getVoVImagePoints()[0];
-
+	
 	// Create a vector of "workers", each doing a separate backproject calculation.
 	vector<thread> workers;
 
-	/*
-	*	For every feature point that we find in our image, we do the backprojection.
-	*/
 	for (int counter = 0; counter < imagepoints.size(); counter++)
-	{
-		workers.push_back(thread([&_3dToDescriptorVector,&T, &K, &imagepoints, &cloud, &descriptors1, &indexingVector, counter]()
-		{
-			vector<double> bestPoint = Reprojection::backproject(T, K, imagepoints[counter], cloud);
-
-
-			// Define the 3D coordinate
-			Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
-
-			// Define its descriptor, should have size 1x128
-			Mat desc;
-
-			desc = descriptors1.row( indexingVector[counter] );
-
-
-			// Vectors are not thread safe, make sure only one thread at a time access it.
-			global_mutex.lock();
-			//cout << counter << endl;
-			// Push the pair into the lookup table
-			_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
-			global_mutex.unlock();
-
-		}));
+	{	
+		workers.push_back(
+			thread(&calcBestPoint,
+				&_3dToDescriptorVector,
+				T,
+				K,
+				keypoints1,
+				cloud,
+				descriptors1,
+				counter));
 
 	}
 
@@ -529,6 +563,7 @@ vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr clo
 
 	return _3dToDescriptorVector;
 }
+*/
 
 string type2str(int type) {
 	string r;
@@ -552,6 +587,8 @@ string type2str(int type) {
 
 	return r;
 }
+
+
 
 
 void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile)
@@ -595,4 +632,75 @@ void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile)
 	lstorage["img"] >> tunnelDescriptor;
 	lstorage.release();
 
+}
+
+
+
+void calcBestPoint(
+	vector< pair<Point3d, Mat> >& _3dToDescriptorVector,
+	Mat T,
+	Mat K,
+	vector<KeyPoint> keypoints1,
+	Mat descriptors1,
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+	int start,
+	int end,
+	int threadIndex)
+{
+	//vector<double> bestPoint = Reprojection::backproject(
+	//	T,
+	//	K,
+	//	Point2d(keypoints1[counter].pt.x, keypoints1[counter].pt.y),
+	//	cloud);
+
+
+	for(int i = start; i < end; i += 4)
+	{
+		Point2d queryPoint = Point2d(keypoints1[i].pt.x, keypoints1[i].pt.y);
+
+		vector<double> bestPoint = Reprojection::backproject(T, K, queryPoint, cloud, kdtree);
+
+		if (bestPoint[0] == 0 && bestPoint[1] == 0 && bestPoint[2] == 0)
+			return;
+		//cout << setprecision(15);
+		//cout << "*****************************" << endl;
+		//cout << "Seaching for image point\t" << imagepoints[counter] << endl << endl;
+		//cout << "The best point found:" << endl
+		//	<< "X = \t" << bestPoint[0] << endl
+		//	<< "Y = \t" << bestPoint[1] << endl
+		//	<< "Z = \t" << bestPoint[2] << endl
+		//	<< "DIST = \t" << bestPoint[3] << endl;
+		//cout << "*****************************\n\n\n\n\n";
+
+		/*
+		*	Update the Look Up Table for what descriptor belongs to which image point
+		*
+		*	_3dToDescriptorMap.first[0]  == 3D coordinates vector
+		*
+		*	_3dToDescriptorVector[i].first.x == X
+		*	_3dToDescriptorVector[i].first.y == Y
+		*	_3dToDescriptorVector[i].first.z == Z
+		*
+		*	_3dToDescriptorVector[i].second == its descriptor
+		*/
+		// Define the 3D coordinate
+		Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
+
+		// Define its descriptor, should have size 1x128
+		Mat desc;
+		if (i > descriptors1.rows)
+			return;
+
+		desc = descriptors1.row(i);
+
+		// Vectors are not thread safe, make sure only one thread at a time access it.
+		global_mutex.lock();
+		//cout << "thread " << this_thread::get_id() << " found point " << endl;
+		// Push the pair into the lookup table
+		_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
+		//tunnel3D.push_back(_3dcoord);
+		//tunnelDescriptor.push_back(descriptors1.row(counter));
+		global_mutex.unlock();
+	}
 }
