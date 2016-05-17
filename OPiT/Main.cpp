@@ -59,7 +59,7 @@ int areSame(int index, double x, double y, double xx, double yy)
 
 
 void calcBestPoint(
-	vector< pair<Point3d, Mat> > *_3dToDescriptorVector,
+	vector< pair<Point3d, Mat> >& _3dToDescriptorVector,
 	Mat T,
 	Mat K,
 	vector<KeyPoint> keypoints1,
@@ -72,7 +72,7 @@ void calcBestPoint(
 
 
 void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile);
-vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree);
+//vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree);
 string type2str(int type);
 
 int main(int argc, char** argv)
@@ -89,8 +89,7 @@ int main(int argc, char** argv)
 	cout << endl << "Loading point cloud... ";
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::io::loadPCDFile("gnistangtunneln-semifull-voxelized.pcd", *cloud);
-    std::cerr 	<< "PointCloud before filtering: " << cloud->width * cloud->height
-                << " data points (" << pcl::getFieldsList (*cloud) << ")" << std::endl;
+    
 
 	//Build the kdtree for searching in the point cloud.
 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
@@ -282,8 +281,8 @@ int main(int argc, char** argv)
 				// We create one worker for each keypoint.
 				// The order in which they push their results into the look up table does not matter.
 				workers.push_back(
-						thread( calcBestPoint,
-								&_3dToDescriptorVector,
+						thread( &calcBestPoint,
+								ref(_3dToDescriptorVector),
 								T,
 								K,
 								keypoints1,
@@ -301,7 +300,7 @@ int main(int argc, char** argv)
 				if (workers[l].joinable())
 					workers[l].join();
 			}
-
+			workers.clear();
 
 		}
 
@@ -638,7 +637,7 @@ void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile)
 
 
 void calcBestPoint(
-	vector< pair<Point3d, Mat> > *_3dToDescriptorVector,
+	vector< pair<Point3d, Mat> >& _3dToDescriptorVector,
 	Mat T,
 	Mat K,
 	vector<KeyPoint> keypoints1,
@@ -688,19 +687,18 @@ void calcBestPoint(
 		// Define the 3D coordinate
 		Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
 
-
-
 		// Define its descriptor, should have size 1x128
 		Mat desc;
 		if (i > descriptors1.rows)
 			return;
+
 		desc = descriptors1.row(i);
 
 		// Vectors are not thread safe, make sure only one thread at a time access it.
 		global_mutex.lock();
 		//cout << "thread " << this_thread::get_id() << " found point " << endl;
 		// Push the pair into the lookup table
-		_3dToDescriptorVector->push_back(make_pair(_3dcoord, desc));
+		_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
 		//tunnel3D.push_back(_3dcoord);
 		//tunnelDescriptor.push_back(descriptors1.row(counter));
 		global_mutex.unlock();
