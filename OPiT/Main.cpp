@@ -36,7 +36,7 @@ using namespace std;
 using namespace cv;
 
 const int NR_OF_FRAMES = 40;
-const int FIRST_INDEX = 433, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
+const int FIRST_INDEX = 432, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
 const int NUMBEROFTHREADS = 8;
 const bool PAR_MODE = true;
 
@@ -130,7 +130,7 @@ int main(int argc, char** argv)
 		//tunnel2D.clear(); tunnel3D.clear();
 		
 		begin = std::chrono::high_resolution_clock::now();
-		sprintf(nextimage, "imageSequence\\img_%05d.png", i);
+		sprintf(nextimage, "/Users/januaditya/Thesis/exjobb-data/volvo/out0/img_%05d.png", i);
 		cout << "Loading image: " << nextimage << "... ";
 		Mat frame1 = imread(nextimage);
 		//String filename = "imageSequence\\img_00" + to_string(i) + ".png";

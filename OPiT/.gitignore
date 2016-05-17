@@ -2,6 +2,7 @@
 /build/
 /build2/
 /build3/
+/buildx/
 /buildunix/
 /buildxcode/
 pclWrapper.h

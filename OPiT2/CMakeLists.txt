@@ -20,7 +20,7 @@ add_definitions(-DLOGMODE)
 
 #set compiler flag to C++11
 set (CMAKE_CXX_COMPILER "/usr/bin/clang++")
-set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -Os")
+set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -g")
 
 #add subdirectory
 add_subdirectory (shared)
