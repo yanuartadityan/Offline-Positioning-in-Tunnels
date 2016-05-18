@@ -344,3 +344,7 @@ ModelManifest.xml
 /OPiT/cvsba-1.0.0/config.cmake.in
 /OPiT/cvsba-1.0.0/cmake_uninstall.cmake.in
 /OPiT/cvsba-1.0.0/CMakeLists.txt
+/OPiT/imageSequence
+/OPiT/OPiT.sln
+/OPiT/OPiT.VC.db
+/OPiT/logs/cameraPositions.txt
