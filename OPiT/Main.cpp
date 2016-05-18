@@ -5,6 +5,9 @@
 
 
 */
+#include <cvsba.h>
+#include <sba.h>
+
 //OPENCV
 #include <opencv2/features2d.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -21,7 +24,7 @@
 #include "FeatureDetection.h"
 #include "PnPSolver.h"
 #include "Calibration.h"
-//#include "VisualOdometry.h"
+//#include "VisualOdometry.h"a
 #include "Reprojection.h"
 
 
@@ -80,7 +83,7 @@ int main(int argc, char** argv)
 	Mat frame1;
 	Mat descriptors1;
 	vector<KeyPoint> keypoints1;
-
+	
 	auto beginningOfMain = std::chrono::high_resolution_clock::now();
 
 	auto begin = std::chrono::high_resolution_clock::now();
@@ -400,7 +403,33 @@ int main(int argc, char** argv)
 		}
 		*/
 
+		/*
+		auto begin = std::chrono::high_resolution_clock::now();
+		cout << "Performing Bundle Adjustment... ";
+		vector<Point3d> points;
+		for (pair<Point3d, Mat> pair : _3dToDescriptorVector)
+			points.push_back(pair.first);
+		const vector<vector <Point2d> > imagePoints = { solver1.getImagePoints() };
+		const vector<vector<int> > visibility = { vector<int>(imagePoints.size(), 1) };
+		vector<Mat> cameraMatrices = { calib.getCameraMatrix() };
+		vector<Mat> rotationMatrices = { solver1.getRotationMatrix() };
+		vector<Mat> translationMatrices = { solver1.getTranslationVector() };
+		vector<Mat> distCoeffMatrices = { calib.getDistortionCoeffs() };
 
+		cvsba::Sba sba;
+		sba.run(		points,
+						imagePoints,
+						visibility,
+						cameraMatrices,
+						rotationMatrices,
+						translationMatrices,
+						distCoeffMatrices);
+		
+		cout << " Done!" << endl;
+		auto end = std::chrono::high_resolution_clock::now();
+		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms)" << endl << endl;
+		*/
+		
 		cout << "****************** STARTING OVER ******************" << endl;
 	}
 
@@ -413,35 +442,10 @@ int main(int argc, char** argv)
 		cout << setprecision(10) << pos.at<double>(0,0) << " " << pos.at<double>(1, 0) << " " << pos.at<double>(2, 0) << "; ..."<< endl;
 	cout << "];" << endl << endl;
 	
-	/*
-	// Skeleton code for iterating through the image sequence
-	while (vc.read(frame2))
-	{
-
-	// Change brightness
-	//frame2 = frame2 + Scalar(10,10,10);
-
-
-	//resize(frame2, frame2, Size(frame2.cols / 2, frame2.rows / 2));
-
-	//In the first iteration, only frame2 will contain a frame, so skip this
-	if (counter == 0)
-	{
-	counter++;
-	frame1 = frame2.clone();
-	continue;
-	}
-
-	counter++;
-
-	// frame1 will hold the previous frame, and in the next iteration we will read a new frame into frame2
-	//    These two will thus be continuously cycled.
-	frame1 = frame2.clone();
-
-	if (waitKey(5000) == 'k')
-	break;
-	}
-	*/
+	
+	
+	
+	
 
 	
 	
@@ -695,3 +699,35 @@ void calcBestPoint(
 		global_mutex.unlock();
 	}
 }
+
+
+
+/*
+// Skeleton code for iterating through the image sequence
+while (vc.read(frame2))
+{
+
+// Change brightness
+//frame2 = frame2 + Scalar(10,10,10);
+
+
+//resize(frame2, frame2, Size(frame2.cols / 2, frame2.rows / 2));
+
+//In the first iteration, only frame2 will contain a frame, so skip this
+if (counter == 0)
+{
+counter++;
+frame1 = frame2.clone();
+continue;
+}
+
+counter++;
+
+// frame1 will hold the previous frame, and in the next iteration we will read a new frame into frame2
+//    These two will thus be continuously cycled.
+frame1 = frame2.clone();
+
+if (waitKey(5000) == 'k')
+break;
+}
+*/
