@@ -31,14 +31,15 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
+#include <fstream>
 
 using namespace std;
 using namespace cv;
 
-const int NR_OF_FRAMES = 5;
+const int NR_OF_FRAMES = 250;
 const int FIRST_INDEX = 433, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
 
-const int NUMBEROFTHREADS = 32;
+const int NUMBEROFTHREADS = 16;
 const bool PAR_MODE = true;
 
 std::mutex global_mutex;
@@ -77,6 +78,9 @@ string type2str(int type);
 
 int main(int argc, char** argv)
 {
+	ofstream logFile;
+	logFile.open("logs/cameraPositions.txt", std::ios::out);
+
 	Mat frame1;
 	Mat descriptors1;
 	vector<KeyPoint> keypoints1;
@@ -129,7 +133,7 @@ int main(int argc, char** argv)
 
 	int clearingCounter = 0;
 	// Don't start the loop on the image we handled manually.
-	for (int i = FIRST_INDEX; i <= LAST_INDEX; i++)
+	for (int i = FIRST_INDEX; i < LAST_INDEX; i++)
 	{
 		//tunnel2D.clear(); tunnel3D.clear();
 		
@@ -231,7 +235,7 @@ int main(int argc, char** argv)
 		*/
 		vector< pair<Point3d, Mat> > tempLUT;
 		vector< pair<Point3d, Mat> >::iterator halfwayItr = _3dToDescriptorVector.begin() + _3dToDescriptorVector.size() / 2;
-		vector< pair<Point3d, Mat> >::iterator beginItr = _3dToDescriptorVector.begin();
+		vector< pair<Point3d, Mat> >::iterator endItr = _3dToDescriptorVector.end();
 		clearingCounter++;
 		if (clearingCounter == 5)
 		{
@@ -239,8 +243,8 @@ int main(int argc, char** argv)
 			clearingCounter = 0;
 
 			tempLUT.insert(tempLUT.end(),
-				make_move_iterator(beginItr),
-				make_move_iterator(halfwayItr));
+				make_move_iterator(halfwayItr),
+				make_move_iterator(endItr));
 
 			_3dToDescriptorVector.clear();
 
@@ -407,11 +411,13 @@ int main(int argc, char** argv)
 	auto endOfMain = std::chrono::high_resolution_clock::now();
 	cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(endOfMain - beginningOfMain).count() << " ms)" << endl << endl;
 
-	cout << "Camera Positions:" << endl;
-	cout << "[ ";
+	logFile << "Camera Positions:" << endl << endl << "[ " << flush;
 	for(Mat pos : solver1.camPositions)
-		cout << setprecision(10) << pos.at<double>(0,0) << " " << pos.at<double>(1, 0) << " " << pos.at<double>(2, 0) << "; ..."<< endl;
-	cout << "];" << endl << endl;
+		logFile << setprecision(10) 
+				<< pos.at<double>(0, 0) << " " 
+				<< pos.at<double>(1, 0) << " " 
+				<< pos.at<double>(2, 0) << "; ..." << endl << flush;
+	logFile << "];" << endl << endl << flush;
 	
 	/*
 	// Skeleton code for iterating through the image sequence
@@ -444,7 +450,7 @@ int main(int argc, char** argv)
 	*/
 
 	
-	
+	logFile.close();
 
 	return 0;
 }

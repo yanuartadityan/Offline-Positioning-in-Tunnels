@@ -320,3 +320,7 @@ ModelManifest.xml
 /OPiT/cloud-early.pcd
 /OPiT/results.txt
 /OPiT/gnistangtunneln-semifull-voxelized.pcd
+/OPiT/imageSequence
+/OPiT/OPiT.sln
+/OPiT/OPiT.VC.db
+/OPiT/logs/cameraPositions.txt
