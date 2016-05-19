@@ -118,8 +118,8 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 {
     const double THRESHOLD = 0.01;
     const double MIN_DIST = 5.0;
-    const double MAX_DIST = 50.0;
-    const double DELTA_Z = 0.2;
+    const double MAX_DIST = 40.0;
+    const double DELTA_Z = 0.05;
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
