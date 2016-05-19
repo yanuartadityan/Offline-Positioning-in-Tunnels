@@ -348,3 +348,8 @@ ModelManifest.xml
 /OPiT/OPiT.sln
 /OPiT/OPiT.VC.db
 /OPiT/logs/cameraPositions.txt
+/OPiT/entrance-sift-non-roi.png
+/OPiT/entrance-sift-roi.png
+/OPiT/logs/reprojectionBackup.txt
+/OPiT/logs/PnPSolverBackup.txt
+/OPiT/logs/mainBackup.txt
