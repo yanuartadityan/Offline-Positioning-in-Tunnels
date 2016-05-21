@@ -53,22 +53,6 @@ int PnPSolver::run(int verbalOutput)
 
 
 
-
-	/*
-	recoverPose() described here: http://docs.opencv.org/3.0-beta/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#recoverpose
-	*/
-	// recoverPose(
-	// 	essentialMatrix,
-	// 	VoVImagePoints[0],
-	// 	VoVImagePoints[1],
-	// 	R,
-	// 	t,
-	// 	cameraMatrix.at<double>(0, 0),
-	// 	Point2d(cameraMatrix.at<double>(0, 2), cameraMatrix.at<double>(1, 2)),
-	// 	mask
-	// 	);
-
-
 	Mat inliers;
 	/*
 	solvePnPRansac(): Finds an object pose from 3D-2D point correspondences using the RANSAC scheme.
@@ -126,26 +110,11 @@ int PnPSolver::run(int verbalOutput)
 	cameraPose(Range(0, 3), Range(0, 3)) = rMat.t();
 	//Copies tvec into the camera pose
 	cameraPose(Range(0, 3), Range(3, 4)) = -(rMat.t()) * tVec;
+
 	// Fill the last row of the camera pose matrix with [0, 0, 0, 1]
 	double *p = cameraPose.ptr<double>(3);
 	p[0] = p[1] = p[2] = 0; p[3] = 1;
 
-
-
-	/* undistortPoints giving some funny results, not sure how to use it
-
-	vector<Point2f> uImagePoints;
-
-	undistortPoints(projectedImagePoints, uImagePoints, cameraMatrix, distCoeffs);
-
-	cout << endl << endl << "******************************************" << endl;
-	cout << "image points \t\t undistorted points" << endl;
-	for (int i = 0; i < uImagePoints.size(); i++)
-	{
-		cout << imagePoints.at(i) << "\t" << uImagePoints.at(i) << endl;
-	}
-	cout << "******************************************" << endl;
-	*/
 
 
 
@@ -164,49 +133,13 @@ int PnPSolver::run(int verbalOutput)
 	Note that transposed rotation (R^t) does the inverse operation to original rotation but is much faster to calculate than  the inverse (R^-1).
 	*/
 	PnPSolver::cameraPosition.create(3, 1, DataType<double>::type);
-	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 1);
+	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 0);
 
 	//cameraPosition = -1 * rMat.t() * tVec;
 	PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
 
 	camPositions.push_back(PnPSolver::cameraPosition.clone());
 
-	/*
-		Taken from: https://en.wikipedia.org/wiki/Essential_matrix#3D_points_from_corresponding_image_points
-
-	Mat rMatRow1 = rMat.row(1), rMatRow3 = rMat.row(2);
-
-	Mat y = (Mat_<float>(1, 3) << VoVImagePoints[0][0].x, VoVImagePoints[0][0].y, 1.0f );
-	y.convertTo(y, CV_64FC1);
-	*/
-
-
-	/*
-		From: http://www.nature.com/nature/journal/v293/n5828/pdf/293133a0.pdf
-
-		SUPER WEIRD RESULTS
-			Guess some of the matrices are used incorrectly.
-
- 	Mat Z1 = ( (rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * tVec);
-	//cout << "Z1 = " << Z1 << endl;
-	Mat Z2 = (Mat_<float>(1, 3)); Z2 = ((rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * y.t());
-	//cout << "Z2  = " << Z2 << endl;
-
-	Mat Z = Z1 / Z2;
-
-
-	Mat Y = Z * VoVImagePoints[0][0].y;
-	Mat X = Z * VoVImagePoints[0][0].x;
-
-
-	cout << "Unprimed X Y Z = " << endl << X << endl << Y << endl << Z << endl << endl;
-
-	Mat XX = rMat * (X - tVec);
-	Mat YY = rMat * (Y - tVec);
-	Mat ZZ = rMat * (Z - tVec);
-
-	cout << "Primed X Y Z = " << endl << XX << endl << endl << YY << endl << endl << ZZ << endl << endl;
-	*/
 
 
 	if(verbalOutput)

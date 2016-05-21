@@ -12,7 +12,6 @@ else()
     set (LIB_SOURCES    ./source/Calibration.cpp
                         ./source/Converter.cpp
                         ./source/FeatureDetection.cpp
-                        ./source/MainWrapper.cpp
                         ./source/ManualCorrespondences.cpp
                         ./source/PCLCloudSearch.cpp
                         ./source/PnPSolver.cpp

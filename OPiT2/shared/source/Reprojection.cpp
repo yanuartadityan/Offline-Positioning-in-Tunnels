@@ -116,10 +116,10 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
 {
-    const double THRESHOLD = 0.01;
-    const double MIN_DIST = 5.0;
-    const double MAX_DIST = 40.0;
-    const double DELTA_Z = 0.05;
+    const double THRESHOLD = 0.0025;
+    const double MIN_DIST = 2.0;
+    const double MAX_DIST = 60.0;
+    const double DELTA_Z = 0.1;
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
@@ -195,11 +195,11 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 // using radius instead
 vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
 {
-	double MIN_DIST = 1.0f;			// in pixel
-	double MAX_DIST = 50.0f;		// in pixel
+	double MIN_DIST = 5.0f;			// in pixel
+	double MAX_DIST = 40.0f;		// in pixel
     double min_dist_L2;
     double max_dist_L2;
-	double RADIUS = 0.1f;			// 10 centimeter
+	double RADIUS = 0.2f;			// 10 centimeter
 	double THRESHOLD = 0.01f;		// 1 centimeter
 	double DELTA_Z;					// meter
 

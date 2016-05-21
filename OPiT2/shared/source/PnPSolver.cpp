@@ -36,12 +36,22 @@ PnPSolver::PnPSolver()
 {
 	setWorldPoints();
 	setVoVImagePoints();
+}
 
+PnPSolver::PnPSolver(int iterCount, int repError, double confidence)
+{
+	setWorldPoints();
+	setVoVImagePoints();
+	paramIterCount  = iterCount;
+	paramRepError   = repError;
+	paramConfidence = confidence;
+}
 
-
-
-
-
+void PnPSolver::setPnPParam(int iterCount, int repError, double confidence)
+{
+	paramIterCount  = iterCount;
+	paramRepError   = repError;
+	paramConfidence = confidence;
 }
 
 int PnPSolver::run(int verbalOutput)
@@ -93,9 +103,9 @@ int PnPSolver::run(int verbalOutput)
 		tVec,						// Output translation vector
 		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 									//						of the rotation and translation vectors, respectively, and further optimizes them.
-		1000,						// ITERATIONS COUNT, number of iterations
-		5,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
-		0.99,						// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
+		paramIterCount,				// ITERATIONS COUNT, number of iterations
+		paramRepError,				// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
+		paramConfidence,			// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
 		SOLVEPNP_EPNP);				// FLAGS, method for solving a PnP problem.
@@ -229,7 +239,8 @@ int PnPSolver::run(int verbalOutput)
 	        //                           << cameraPose.at<double>(1,3) << ", "
 	        //                           << cameraPose.at<double>(2,3) << "]" << endl;
 
-			cout << "[" << cameraPose.at<double>(0,3) << ", "
+			cout << "[" << std::fixed << setprecision(10)
+									  << cameraPose.at<double>(0,3) << ", "
 									  << cameraPose.at<double>(1,3) << ", "
 									  << cameraPose.at<double>(2,3) << "]" << endl;
 

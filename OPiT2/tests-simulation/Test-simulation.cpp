@@ -376,8 +376,8 @@ int main (int argc, char *argv[])
         // 15. check reprojection error of each backprojected world points
         vector<Point2d> reprojectedPixels;
         projectPoints(_3dTemp,
-                      solverRefined.getRotationMatrix(),
-                      solverRefined.getTranslationVector(),
+                      solver.getRotationMatrix(),
+                      solver.getTranslationVector(),
                       calib.getCameraMatrix(),
                       calib.getDistortionCoeffs(),
                       reprojectedPixels);
@@ -478,9 +478,9 @@ void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
 
-    for (int i=start; i<end; i+=16)
+    for (int i=start; i<end; i++)
     {
-        //temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
+        // temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
         temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
 
         // Define the 3D coordinate
