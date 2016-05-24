@@ -32,11 +32,7 @@ FeatureDetection::FeatureDetection()
 	// surf
 	min_hessian = 200;
 	octave_layer = 3;
-<<<<<<< HEAD
 	contrast_threshold = 0.01;			// default 0.04, lower value more features
-=======
-	contrast_threshold = 0.02;			// default 0.04, lower value more features
->>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 	edge_threshold = 10;				// default 10, higher value more features
 	sigma = 1.6;
 
@@ -227,17 +223,10 @@ void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> de
     siftdetect_->compute(img, detectedPoints, descriptor);
 }
 
-<<<<<<< HEAD
 void FeatureDetection::bfMatcher (cv::Mat queryDesc, cv::Mat trainDesc, std::vector<std::vector<DMatch> > &matches)
 {
 	// matching using BF L2
 	matcher_->knnMatch(queryDesc, trainDesc, matches, 200);
-=======
-void FeatureDetection::bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<DMatch> > &matches)
-{
-	// matching using BF L2
-	matcher_->knnMatch(queryDesc, trainDesc, matches, 100);
->>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 }
 
 void FeatureDetection::drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output)
