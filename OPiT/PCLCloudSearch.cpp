@@ -14,10 +14,6 @@
 
 std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double z, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
 {
-	//pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-
-	//kdtree.setInputCloud(cloud);
-
 	pcl::PointXYZ searchPoint;
 
 	searchPoint.x = x;

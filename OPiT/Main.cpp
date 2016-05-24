@@ -97,15 +97,14 @@ void calcBestPoint(
 		vector<double> bestPoint = Reprojection::backproject(T, K, queryPoint, cloud, kdtree);
 
 		if (bestPoint[0] == 0 && bestPoint[1] == 0 && bestPoint[2] == 0)
-			return;
+			continue;
 
 		// Define the 3D coordinate
 		Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
 
 		// Define its descriptor, should have size 1x128
 		Mat desc;
-		if (i > descriptors1.rows)
-			return;
+		
 
 		desc = descriptors1.row(i);
 
@@ -214,8 +213,6 @@ int main(int argc, char** argv)
 		fdetect.siftExtraction(frame1, keypoints1, descriptors1);
 		end = std::chrono::high_resolution_clock::now();
 		cout << "Done!\tFound " << descriptors1.rows << " descriptors (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl;
-
-		
 
 		// Take the descriptor mat out of our lookup table for the matching
 		Mat tunnelDescriptors;
