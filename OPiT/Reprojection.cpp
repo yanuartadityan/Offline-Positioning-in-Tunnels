@@ -183,13 +183,8 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
         if (newPoint[3] < THRESHOLD)
         {
             // return the lerp
-<<<<<<< HEAD
             bestPoint = LinearInterpolation (newPoint, origin_w, p_);
 
-=======
-            //bestPoint = LinearInterpolation (newPoint, origin_w, p_);
-			bestPoint = { newX,newY,newZ };
->>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
             break;
         }
     }

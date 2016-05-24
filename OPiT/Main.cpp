@@ -37,20 +37,12 @@
 using namespace std;
 using namespace cv;
 
-<<<<<<< HEAD
 const int NR_OF_FRAMES = 15;
 const int FIRST_INDEX = 433, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
 const int NUMBEROFTHREADS = 8;
 
 const bool PAR_MODE = true;
 static const bool DRAWKPTS = true;
-
-std::mutex global_mutex;
-
-const int NR_OF_FRAMES = 40;
-const int FIRST_INDEX = 432, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
-const int NUMBEROFTHREADS = 8;
-const bool PAR_MODE = true;
 
 std::mutex global_mutex;
 
@@ -102,8 +94,6 @@ int main(int argc, char** argv)
 	Mat descriptors1;
 	vector<KeyPoint> keypoints1;
 	vector<double> reprojectionErrors;
-
-	auto beginningOfMain = std::chrono::high_resolution_clock::now();
 
 	auto beginningOfMain = std::chrono::high_resolution_clock::now();
 
