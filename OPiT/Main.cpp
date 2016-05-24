@@ -39,8 +39,9 @@
 using namespace std;
 using namespace cv;
 
-const int NR_OF_FRAMES = 15;
+const int NR_OF_FRAMES = 25;
 const int FIRST_INDEX = 433, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
+const int CLEARING_PERIODICITY = 5;
 
 const int NUMBEROFTHREADS = 16;
 const bool PAR_MODE = true;
@@ -85,8 +86,8 @@ void calcBestPoint(
 	Mat K,													
 	vector<KeyPoint> keypoints1,
 	Mat descriptors1,
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+	pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+	pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
 	int start,
 	int end)
 {
@@ -94,7 +95,7 @@ void calcBestPoint(
 	{
 		Point2d queryPoint = Point2d(keypoints1[i].pt.x, keypoints1[i].pt.y);
 
-		vector<double> bestPoint = Reprojection::backproject(T, K, queryPoint, cloud, kdtree);
+		vector<double> bestPoint = Reprojection::backproject(T, K, queryPoint, std::ref(cloud), std::ref(kdtree));
 
 		if (bestPoint[0] == 0 && bestPoint[1] == 0 && bestPoint[2] == 0)
 			continue;
@@ -182,7 +183,7 @@ int main(int argc, char** argv)
 	sprintf(map2Dto3D, "ManualCorrespondences.txt");
 	sprintf(mapDescrip, "ManualCorrespondences.yml");
 
-	prepareMap(map2Dto3D, mapDescrip, ref(tunnel2D), ref(tunnel3D), ref(tunnelDescriptor));
+	prepareMap(map2Dto3D, mapDescrip, std::ref(tunnel2D), std::ref(tunnel3D), std::ref(tunnelDescriptor));
 
 	for (int h = 0; h < tunnel3D.size(); h++)
 	{
@@ -274,31 +275,6 @@ int main(int argc, char** argv)
 
 
 
-		/*
-		*	To prevent the LUT from growing too big and possibly match against too old entries,
-		*		we periodically clear the first half.
-		*/
-		vector< pair<Point3d, Mat> > tempLUT;
-		vector< pair<Point3d, Mat> >::iterator halfwayItr = _3dToDescriptorVector.begin() + _3dToDescriptorVector.size() / 2;
-		vector< pair<Point3d, Mat> >::iterator endItr = _3dToDescriptorVector.end();
-		clearingCounter++;
-		if (clearingCounter == 5)
-		{
-			cout << "Clearing the LUT..." << endl;
-			clearingCounter = 0;
-
-			tempLUT.insert(tempLUT.end(),
-				make_move_iterator(halfwayItr),
-				make_move_iterator(endItr));
-
-			_3dToDescriptorVector.clear();
-
-			_3dToDescriptorVector = move(tempLUT);
-
-			tempLUT.clear();
-
-			cout << "New size of LUT: " << _3dToDescriptorVector.size() << endl;
-		}
 
 
 
@@ -332,16 +308,16 @@ int main(int argc, char** argv)
 				// The order in which they push their results into the look up table does not matter.
 				workers.push_back(
 						thread( calcBestPoint,
-								ref(_3dToDescriptorVector),
-								ref(projectedKeypoints),
-								ref(projectedWorldpoints),
-								ref(projectedIndex),
+								std::ref(_3dToDescriptorVector),
+								std::ref(projectedKeypoints),
+								std::ref(projectedWorldpoints),
+								std::ref(projectedIndex),
 								T,
 								K,
 								keypoints1,
 								descriptors1,
-								cloud,
-								kdtree,
+								std::ref(cloud),
+								std::ref(kdtree),
 								start,
 								end));
 			}
@@ -410,22 +386,48 @@ int main(int argc, char** argv)
 		
 
 
-		
-		// Calculate the miss rate
-		//Point3d cmp; cmp.x = 0; cmp.y = 0; cmp.z = 0;
-		//int misses = 0;
-		//cout << "All found points: " << endl;
-		//for (pair<Point3d, Mat> item : _3dToDescriptorVector)
-		//{
-		//	//cout << "[" << item.first.x << ", " << item.first.y << ", " << item.first.z << "]" << endl;
-		//	if (item.first == cmp)
-		//		misses++;
-		//}
-		//cout << "Number of misses: " << misses << " (" << ((double)misses / _3dToDescriptorVector.size()) * 100 << "%)" << endl;
+
+
+
+
+
+		/*
+		DEBUGGING STUFF
+		*/
+
 		
 		cout << "Camera Position:" << endl << solver1.getCameraPosition() << endl;
 		
 
+
+		/*
+		*	To prevent the LUT from growing too big and possibly match against too old entries,
+		*		we periodically everything but the last frame's backprojection results.
+		*/
+		vector< pair<Point3d, Mat> > tempLUT(projectedIndex.size());
+		if (++clearingCounter == CLEARING_PERIODICITY)
+		{
+			cout << "Clearing the LUT... Last number of successful backprojections was " << projectedIndex.size() << endl;
+			clearingCounter = 0;
+
+			size_t diff = abs(projectedIndex.size() - _3dToDescriptorVector.size());
+			vector< pair<Point3d, Mat> >::iterator begIt = _3dToDescriptorVector.begin(); 
+
+			move(( begIt + diff), _3dToDescriptorVector.end(), tempLUT.begin());
+
+			_3dToDescriptorVector.erase(_3dToDescriptorVector.begin());
+
+			move(tempLUT.begin(), tempLUT.end(), _3dToDescriptorVector.begin());
+
+			tempLUT.erase(tempLUT.begin());
+
+			cout << "New size of LUT: " << _3dToDescriptorVector.size() << endl;
+
+		}
+
+
+
+		
 		
 		// 15. check reprojection error of each backprojected world points
 		vector<Point2d> reprojectedPixels;
@@ -479,9 +481,13 @@ int main(int argc, char** argv)
 		cout << " Done!" << endl;
 		auto end = std::chrono::high_resolution_clock::now();
 		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms)" << endl << endl;
+		
+		
+		
+		
 		*/
 		/*
-		*		Let's print all the calculated camera positions!
+		*		Let's print all the calculated camera positions to a log file!
 		*/
 		Mat pos = solver1.getCameraPosition();
 		logFile << setprecision(10)

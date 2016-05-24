@@ -32,7 +32,7 @@ using namespace cv;
 *	x = K * [R|t] * X
 *
 */
-vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
+vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree)
 {
     const double THRESHOLD = 0.05;
     const double MIN_DIST = 2.0;
@@ -89,7 +89,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
          *		for finding the closest neighbour (point) in the point cloud.
          */
         newX = p_.at<double>(0, 0);	newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
-        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud, kdtree);
+        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, std::ref(cloud), std::ref(kdtree));
 
         /*
          *	As soon as we find a "good enough" point, return it,
