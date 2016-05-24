@@ -1,3 +1,4 @@
 # Ignore build directory
-build/
-buildx/
+/build/
+/buildx/
+/cloud/

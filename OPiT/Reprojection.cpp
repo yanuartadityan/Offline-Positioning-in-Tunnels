@@ -116,20 +116,20 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
 {
-    const double THRESHOLD = 0.05;
-    const double MIN_DIST = 5.0;
-    const double MAX_DIST = 40.0;
-    const double DELTA_Z = 0.2;
-    
+    const double THRESHOLD = 0.0025;
+    const double MIN_DIST = 3.0;
+    const double MAX_DIST = 60.0;
+    const double DELTA_Z = 0.1;
+
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
     double newX, newY, newZ;
-    
+
     // setup the camera origin in world coordinate
     Mat origin_p = (Mat_<double>(3,1) << 0, 0, 0);
     Mat origin_c = K.inv() * origin_p;
     Mat origin_w = T * (Mat_<double>(4, 1) << origin_c.at<double>(0, 0), origin_c.at<double>(1, 0), origin_c.at<double>(2, 0), 1);
-    
+
     for (double i = MIN_DIST; i < MAX_DIST; i += DELTA_Z)
     {
         /*
@@ -137,8 +137,8 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
          *		together with i which represents going "one step further" on the ray.
          */
         p = (Mat_<double>(3, 1) << i*imagepoint.x, i*imagepoint.y, i);
-        
-        
+
+
         /*
          *	We use the inverse camera matrix (K) to bring the image coordinate from the
          *		Image coordinate system
@@ -148,15 +148,15 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
          *
          */
         p = K.inv() * p;
-        
-        
+
+
         /*
          *	To represent a 3D point in the world coordinate system as a homogeneous point,
          *		we need a 4x1 vector, containing the X, Y, Z and a 1.
          */
         p3d = (Mat_<double>(4, 1) << p.at<double>(0, 0), p.at<double>(1, 0), p.at<double>(2, 0), 1);
-        
-        
+
+
         /*
          *	We use our 4x4 transformation matrix (T), which is equal to our camera pose matrix,
          *		to bring the point from the
@@ -168,14 +168,14 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
          *		p' = T * (x, y, z, 1)^T
          */
         p_ = T * p3d;
-        
+
         /*
          *	We use the calculated point inside the world coordinate system as the search point
          *		for finding the closest neighbour (point) in the point cloud.
          */
         newX = p_.at<double>(0, 0);	newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
         vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud, kdtree);
-        
+
         /*
          *	As soon as we find a "good enough" point, return it,
          *		since we don't want to risk going too deep into the cloud.
@@ -184,11 +184,11 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
         {
             // return the lerp
             bestPoint = LinearInterpolation (newPoint, origin_w, p_);
-            
+
             break;
         }
     }
-    
+
     return bestPoint;
 }
 

@@ -21,18 +21,10 @@ int main ()
     #endif
 
     // VISUAL ODOMETRY
-    // VO vodometry;
-    // vodometry.initParameter();
-    // vodometry.setImagePath(pathname);
-    // vodometry.visualodometry();
-
-    Point3d origin(5, 4, 3);
-    Point3d sp(8, 7, 6);
-
-    cout << origin << endl << sp << endl;
-
-    double fu = cv::norm(sp-origin);
-    cout << "fu is " << fu << endl;
+     VO vodometry;
+     vodometry.initParameter();
+     vodometry.setImagePath(pathname);
+     vodometry.visualodometry();
 
     return 0;
 }

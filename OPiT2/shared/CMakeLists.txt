@@ -20,6 +20,7 @@ else()
                         ./source/Triangulation.cpp
                         ./source/VisualOdometry.cpp
                         ./source/Common.cpp
-                        ./source/Log.cpp)
+                        ./source/Log.cpp
+                        ./source/BundleAdjust.cpp
     add_library (shared ${LIB_SOURCES})
 endif()

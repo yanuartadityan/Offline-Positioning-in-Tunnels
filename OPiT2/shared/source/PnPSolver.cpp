@@ -108,7 +108,7 @@ int PnPSolver::run(int verbalOutput)
 		paramConfidence,			// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
-		SOLVEPNP_EPNP);				// FLAGS, method for solving a PnP problem.
+		SOLVEPNP_ITERATIVE);				// FLAGS, method for solving a PnP problem.
 
 		//Create the rotation matrix from the vector created above, by using the "Rodrigues"
 		rMat.create(3, 3, DataType<double>::type);
