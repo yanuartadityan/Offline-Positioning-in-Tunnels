@@ -68,7 +68,6 @@ void Common::prepareMap (char* mapCoordinateFile, char* mapKeypointsFile, vector
     mapFile.open(mapCoordinateFile);
 
     double temp=0,a=0,b=0,x=0,y=0,z=0;
-
     if (mapFile.is_open())
     {
         while (getline(mapFile, line) && !mapFile.eof())
@@ -78,7 +77,6 @@ void Common::prepareMap (char* mapCoordinateFile, char* mapKeypointsFile, vector
             for (int i=0; i<5; i++)
             {
                 in >> temp;
-
                 if (i==0)
                     a = temp;
                 if (i==1)

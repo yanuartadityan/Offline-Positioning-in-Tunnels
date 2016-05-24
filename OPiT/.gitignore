@@ -3,7 +3,10 @@
 /build2/
 /build3/
 /buildx/
+<<<<<<< HEAD
 /buildx2/
+=======
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 /buildunix/
 /buildxcode/
 pclWrapper.h

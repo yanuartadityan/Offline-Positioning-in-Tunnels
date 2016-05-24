@@ -103,6 +103,7 @@ int PnPSolver::run(int verbalOutput)
 		tVec,						// Output translation vector
 		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 									//						of the rotation and translation vectors, respectively, and further optimizes them.
+<<<<<<< HEAD
 		paramIterCount,				// ITERATIONS COUNT, number of iterations
 		paramRepError,				// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
 		paramConfidence,			// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
@@ -116,6 +117,14 @@ int PnPSolver::run(int verbalOutput)
 		//Create the translation matrix from the vector created above, by using the "Rodrigues"
 		tMat.create(3, 3, DataType<double>::type);
 		Rodrigues(tVec, tMat);
+=======
+		1000,						// ITERATIONS COUNT, number of iterations
+		5,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
+		0.99,						// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
+									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
+		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
+		SOLVEPNP_EPNP);				// FLAGS, method for solving a PnP problem.
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 
 		//Instead of only keeping the 4x4 pose matrix, also keep the 3x4
 		cameraPose34.create(3, 4, rMat.type());
@@ -162,12 +171,16 @@ int PnPSolver::run(int verbalOutput)
 
 		/*	Equation taken from: http://stackoverflow.com/questions/22389896/finding-the-real-world-coordinates-of-an-image-point
 
+<<<<<<< HEAD
 		P = Position in world coordinates (assume this is (x, y, z, 1))
 		p = Position in image coordinates (assume this is (0, 0, 1))
 		R = Rotation matrix    (R^t = R transposed)
 		t = translation vector
 
 										      position = R.t * (K^-1 * (u, v, 1)) - t)
+=======
+	camPositions.push_back(PnPSolver::cameraPosition.clone());
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 
 		P = R^t (p-t)		Previously:	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
 
@@ -209,6 +222,7 @@ int PnPSolver::run(int verbalOutput)
 		Mat X = Z * VoVImagePoints[0][0].x;
 
 
+<<<<<<< HEAD
 		cout << "Unprimed X Y Z = " << endl << X << endl << Y << endl << Z << endl << endl;
 
 		Mat XX = rMat * (X - tVec);
@@ -249,6 +263,37 @@ int PnPSolver::run(int verbalOutput)
             //                                     << cameraPosition.at<double>(2) << "]" << endl;
 
 	#include <iomanip>
+=======
+	if(verbalOutput)
+	{
+//		cout << endl << "***********************************************" << endl << endl;
+//
+//		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
+//
+//		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
+//
+//		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
+//
+//		cout << "R =" << endl << rMat << endl << endl;
+//
+//		cout << "T =" << endl << tMat << endl << endl;
+//
+//		cout << "t =" << endl << tVec << endl << endl;
+//
+		// cout << "Camera Pose = [" << cameraPose.at<double>(0,3) << ", "
+        //                           << cameraPose.at<double>(1,3) << ", "
+        //                           << cameraPose.at<double>(2,3) << "]" << endl;
+
+		cout << "[" << cameraPose.at<double>(0,3) << ", "
+								  << cameraPose.at<double>(1,3) << ", "
+								  << cameraPose.at<double>(2,3) << "]" << endl;
+
+//		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
+//									   << cameraPosition.at<double>(1) << ", "
+//									   << cameraPosition.at<double>(2) << "]" << endl;
+
+#include <iomanip>
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 
 
 

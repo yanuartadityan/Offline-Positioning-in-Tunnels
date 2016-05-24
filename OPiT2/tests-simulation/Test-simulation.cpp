@@ -109,7 +109,7 @@ int main (int argc, char *argv[])
     sprintf(map2Dto3D, "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.txt");
     sprintf(mapDescrip,"/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.yml");
 
-    com.prepareMap(map2Dto3D, mapDescrip, &tunnel2D, &tunnel3D, &tunnelDescriptor);
+    com.prepareMap(map2Dto3D, mapDescrip, ref(tunnel2D), ref(tunnel3D), ref(tunnelDescriptor));
 
     // 3. start the routing and initiate all variables
     char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/out0/";

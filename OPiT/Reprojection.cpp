@@ -116,10 +116,17 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
 {
+<<<<<<< HEAD
     const double THRESHOLD = 0.0025;
     const double MIN_DIST = 3.0;
     const double MAX_DIST = 60.0;
     const double DELTA_Z = 0.1;
+=======
+    const double THRESHOLD = 0.05;
+    const double MIN_DIST = 15.0;
+    const double MAX_DIST = 25.0;
+    const double DELTA_Z = 0.25;
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
@@ -183,8 +190,13 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
         if (newPoint[3] < THRESHOLD)
         {
             // return the lerp
+<<<<<<< HEAD
             bestPoint = LinearInterpolation (newPoint, origin_w, p_);
 
+=======
+            //bestPoint = LinearInterpolation (newPoint, origin_w, p_);
+			bestPoint = { newX,newY,newZ };
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
             break;
         }
     }

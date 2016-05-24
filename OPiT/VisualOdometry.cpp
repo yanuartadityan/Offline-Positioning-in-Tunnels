@@ -14,8 +14,13 @@ using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
 
+<<<<<<< HEAD
 #define STARTFRAME  432
 #define MAXFRAME    532
+=======
+#define STARTFRAME  333
+#define MAXFRAME    1000
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 
 /*
     A class for implementing visual odometry.
@@ -310,6 +315,7 @@ void VO::siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
      }
 
     // convert
+<<<<<<< HEAD
     vector<Point2f> point1_ransac, point2_ransac;
     point1_ransac.clear();
     point2_ransac.clear();
@@ -330,6 +336,15 @@ void VO::siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
             points2.push_back(point2_ransac[i]);
         }
     }
+=======
+    cv::KeyPoint::convert(matched1, points1, vector<int>());
+    cv::KeyPoint::convert(matched2, points2, vector<int>());
+
+    // detect inliers by using F matrix
+    //kill outliers with ransac
+    vector<uchar> inliers(points1.size(),0);
+    findFundamentalMat(Mat(points1), Mat(points2), inliers, CV_FM_RANSAC, 3.f, 0.99f);
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
 }
 
 //SIFT with mask
@@ -530,7 +545,7 @@ void VO::initParameter()
 
     /* 0 - fast,  1 - sift, 2 - surf,    3 - lukaskanade
        4 - akaze, 5 - orb,  6 - fastsift */
-    vo_method = 1;
+    vo_method = 0;
 
     // fast
     fast_threshold = 20;
@@ -538,9 +553,15 @@ void VO::initParameter()
 
     // surf
     min_hessian = 200;
+<<<<<<< HEAD
     octave_layer = 3;
     contrast_threshold = 0.004f;
     edge_threshold = 20;
+=======
+    octave_layer = 4;
+    contrast_threshold = 0.005f;
+    edge_threshold = 10;
+>>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de
     sigma = 1.6;
 
     // sift

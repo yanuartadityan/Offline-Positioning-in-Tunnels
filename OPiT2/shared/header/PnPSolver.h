@@ -11,7 +11,6 @@ public:
 	PnPSolver(int iterCount, int repError, double confidence);
 
 	void setPnPParam(int iterCount, int repError, double confidence);
-
 	void setWorldPoints();
 	void setWorldPoints(std::vector<cv::Point3d> WP);
 	std::vector<cv::Point3d> getWorldPoints();
@@ -56,7 +55,6 @@ private:
 	int paramIterCount;
 	int paramRepError;
 	double paramConfidence;
-
 };
 
 #endif
