@@ -40,7 +40,7 @@ int main (int argc, char *argv[])
     Mat                             tunnelDescriptor;
 
     Calibration cal;
-    PnPSolver pnp(1000, 5, 0.9);
+    PnPSolver pnp(1000, 5, 0.99);
     PnPSolver pnprefined(1000, 5, 0.99);
     FeatureDetection feat;
     BundleAdjust ba;
@@ -67,7 +67,7 @@ int main (int argc, char *argv[])
     com.prepareMap(map2Dto3D, mapDescrip, ref(tunnel2D), ref(tunnel3D), ref(tunnelDescriptor));
     com.updatelut(tunnel3D, tunnelDescriptor, ref(lookuptable));
     PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);
-    io::loadPCDFile("/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/gnistangtunneln-semifull-voxelized2.pcd", *cloud);
+    io::loadPCDFile("/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/gnistangtunneln-semifull-voxelized.pcd", *cloud);
     std::cerr << "cloud: " << cloud->width * cloud->height << " points (" << pcl::getFieldsList (*cloud) << ")" << std::endl;
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud(cloud);
@@ -121,11 +121,28 @@ int main (int argc, char *argv[])
         T = pnp.getCameraPose().clone(); K = cal.getCameraMatrix();
         Mat R = pnp.getRotationMatrix(); Mat t = pnp.getTranslationVector();
 
+        // save the initial camera pose for frame-idx
+        if (LOGMODE)
+        {
+            // save the initial camera position
+            logFile << std::fixed << setprecision(10)
+                    << T.at<double>(0,3) << ", "
+                    << T.at<double>(1,3) << ", "
+                    << T.at<double>(2,3) << ", " << std::flush;
+
+            // save the initial Rotation and Translation matrices from PnP solver
+            logMatrix << std::fixed << setprecision(10)
+                      << R.at<double>(0,0) << ", " << R.at<double>(0,1) << ", " << R.at<double>(0,2) << ", "
+                      << R.at<double>(1,0) << ", " << R.at<double>(1,1) << ", " << R.at<double>(1,2) << ", "
+                      << R.at<double>(2,0) << ", " << R.at<double>(2,1) << ", " << R.at<double>(2,2) << ", "
+                      << t.at<double>(0)   << ", " << t.at<double>(1)   << ", " << t.at<double>(2)   << ", " << std::flush;
+        }
+
         // TODO: a line that changes everything | clear the lut
         tunnel1D.clear(); tunnel2D.clear(); tunnel3D.clear();tunnelDescriptor.release();lookuptable.clear();
 
         // multithread backprojection
-        com.threading(NUMTHREADS, T, K, detectedkpts, descriptor, cloud, kdtree, ref(lookuptable), ref(tunnel3D), ref(tunnel2D), ref(tunnel1D));
+        com.threading(NUMTHREADS, T, K, detectedkpts, descriptor, std::ref(cloud), std::ref(kdtree), std::ref(lookuptable), std::ref(tunnel3D), std::ref(tunnel2D), std::ref(tunnel1D));
 
         // refine the camera pose
         pnprefined.setImagePoints(tunnel2D); pnprefined.setWorldPoints(tunnel3D); pnprefined.run(1);
@@ -160,16 +177,16 @@ int main (int argc, char *argv[])
                                        << tunnel2D[i].y << "\n" << std::flush;
             }
 
-            // save the refined vehicle position, num of keypoints, num of backprojected points and reprojection errror
+            // save the refined vehicle position, num of keypoints, num of backprojected points and reprojection error
             T = pnprefined.getCameraPose().clone();
 
-            logFile << std::fixed << setprecision(4)
+            logFile << std::fixed << setprecision(10)
                     << T.at<double>(0,3) << ", "
                     << T.at<double>(1,3) << ", "
                     << T.at<double>(2,3) << ", " << std::flush;
 
-            logFile << std::fixed << setprecision(4)
-                    << detectedkpts.size()      << ", "
+            logFile << std::fixed << setprecision(10)
+                    << detectedkpts.size()       << ", "
                     << tunnel3D.size()           << ", "
                     << repError/tunnel1D.size()  << "\n" << std::flush;      // end of logPose
 
@@ -177,7 +194,7 @@ int main (int argc, char *argv[])
             R = pnprefined.getRotationMatrix();
             t = pnprefined.getTranslationVector();
 
-            logMatrix << std::fixed << setprecision(4)
+            logMatrix << std::fixed << setprecision(10)
                       << R.at<double>(0,0) << ", " << R.at<double>(0,1) << ", " << R.at<double>(0,2) << ", "
                       << R.at<double>(1,0) << ", " << R.at<double>(1,1) << ", " << R.at<double>(1,2) << ", "
                       << R.at<double>(2,0) << ", " << R.at<double>(2,1) << ", " << R.at<double>(2,2) << ", "
@@ -188,8 +205,19 @@ int main (int argc, char *argv[])
         // TODO: a line that impacts the thesis enormously
         if (ba.getWindowSize() < WINDOWSIZE) ba.pushFrame(tunnel2D, tunnel3D, K, pnp.getRotationMatrix(), pnp.getTranslationVector(), cal.getDistortionCoeffs());
 
+        // close the file
+        if (LOGMODE)
+        {
+           correspondences.close();
+           correspondencesRefined.close();
+        }
+
         com.reportTimer();
         frameIdx++; frameCounter++;
     }
+
+    // close the i/o
+    logFile.close();
+    logMatrix.close();
     return 0;
 }

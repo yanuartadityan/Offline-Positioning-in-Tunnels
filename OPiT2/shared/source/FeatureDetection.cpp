@@ -38,7 +38,7 @@ FeatureDetection::FeatureDetection()
 	sigma = 1.6;
 
 	// sift
-	sift_matching_ratio = 0.8;
+	sift_matching_ratio = 0.6;
 
 	//detector
 	fastdetect_ = FastFeatureDetector::create(
@@ -227,7 +227,7 @@ void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> de
 void FeatureDetection::bfMatcher (cv::Mat queryDesc, cv::Mat trainDesc, std::vector<std::vector<DMatch> > &matches)
 {
 	// matching using BF L2
-	matcher_->knnMatch(queryDesc, trainDesc, matches, 200);
+	matcher_->knnMatch(queryDesc, trainDesc, matches, 10);
 }
 
 void FeatureDetection::drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output)
@@ -282,7 +282,7 @@ void FeatureDetection::computeFeaturesAndMatching(Mat img, vector<Point2d> tunne
     if (frameCounter > 0)
     {
         vector<uchar> state;
-        findFundamentalMat(lutPt, framePt, FM_RANSAC, 1, 0.99, state);
+        findFundamentalMat(lutPt, framePt, FM_RANSAC, 5, 0.99, state);
         vector<Point2d> lutPtRefined, framePtRefined;
         for (size_t i = 0; i < state.size(); ++i)
         {

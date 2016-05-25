@@ -119,8 +119,8 @@ Mat Common::getdescriptor (vector< pair<Point3d, Mat> > lookuptable)
     return descriptorTemp;
 }
 
-void Common::mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
-                        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+void Common::calcBestPoint ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
+                        pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
                         int start, int end, int tidx,
                         vector<pair<Point3d, Mat> > &vocabulary,
                         vector<Point3d> &projected3D,
@@ -129,9 +129,9 @@ void Common::mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descripto
 {
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
-    for (int i=start; i<end; i+=10)
+    for (int i=start; i<end; i+=5)
     {
-        temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
+        temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), std::ref(cloud), std::ref(kdtree));
         _mp3dcoord.x = temp[0]; _mp3dcoord.y = temp[1]; _mp3dcoord.z = temp[2];
         if ((_mp3dcoord.x > 0.0f) && (_mp3dcoord.y > 0.0f) && (_mp3dcoord.z > 0.0f))
         {
@@ -146,15 +146,18 @@ void Common::mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descripto
     }
 }
 
-void Common::threading(int numofthreads, Mat T, Mat K, vector<KeyPoint> detectedkpts, Mat descriptor, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
-                       vector<pair<Point3d, Mat> > &lookuptable, vector<Point3d> &tunnel3D, vector<Point2d> &tunnel2D, vector<int> &tunnel1D)
+void Common::threading( int numofthreads, Mat T, Mat K, vector<KeyPoint> detectedkpts, Mat descriptor,
+                        pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
+                        vector<pair<Point3d, Mat> > &lookuptable, vector<Point3d> &tunnel3D, vector<Point2d> &tunnel2D, vector<int> &tunnel1D)
 {
     int numtask = floor(detectedkpts.size()/numofthreads);
     for (int tidx = 0; tidx < numofthreads; tidx++)
     {
         int start = tidx    * numtask;
         int end   = (tidx+1)* numtask;
-        workers.push_back(thread(&Common::mpThread, this, T, K, detectedkpts, descriptor, cloud, kdtree, start, end, tidx, ref(lookuptable), ref(tunnel3D), ref(tunnel2D), ref(tunnel1D)));
+        workers.push_back(thread(&Common::calcBestPoint,  T, K, detectedkpts, descriptor, std::ref(cloud), std::ref(kdtree),
+                                                          start, end, tidx,
+                                                          std::ref(lookuptable), std::ref(tunnel3D), std::ref(tunnel2D), std::ref(tunnel1D)));
     }
     for (int tidx = 0; tidx < numofthreads; tidx ++) {workers[tidx].join();} workers.clear();
 

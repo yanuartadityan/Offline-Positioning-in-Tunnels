@@ -22,9 +22,9 @@ using namespace cv;
 Reprojection::Reprojection(double thresh, double mind, double maxd, double delta)
 {
 	this->threshold = 0.01;
-	this->mindist   = 2;
-	this->maxdist  	= 80;
-	this->deltaz   	= 0.1;
+	this->mindist   = 5;
+	this->maxdist  	= 150;
+	this->deltaz   	= 0.01;
 }
 
 Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec1, cv::Mat tVec2)
@@ -107,8 +107,6 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 }
 
 
-
-
 /*
 *	Projection algorithm from: http://stackoverflow.com/questions/13957150/opencv-computing-camera-position-rotation
 *
@@ -122,12 +120,12 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 *	x = K * [R|t] * X
 *
 */
-vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
+vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree)
 {
     double THRESHOLD 	= 0.05;
-    double MIN_DIST 	= 10;
-    double MAX_DIST 	= 100;
-    double DELTA_Z 		= 0.1;
+    double MIN_DIST 	= 15;
+    double MAX_DIST 	= 60;
+    double DELTA_Z 		= 0.05;
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
@@ -201,13 +199,13 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 }
 
 // using radius instead
-vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
+vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree)
 {
-	double MIN_DIST = 5.0f;			// in pixel
-	double MAX_DIST = 40.0f;		// in pixel
+	double MIN_DIST = 10.0f;			// in pixel
+	double MAX_DIST = 100.0f;		// in pixel
     double min_dist_L2;
     double max_dist_L2;
-	double RADIUS = 0.2f;			// 10 centimeter
+	double RADIUS = 0.05f;			// 5 centimeter
 	double THRESHOLD = 0.01f;		// 1 centimeter
 	double DELTA_Z;					// meter
 
@@ -256,7 +254,7 @@ vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint,
 
         newX = sPoint.at<double>(0,0); newY = sPoint.at<double>(1,0), newZ = sPoint.at<double>(2,0);
         bestPoint = PCLCloudSearch::FindClosestPointRadius(	newX, newY, newZ, RADIUS, THRESHOLD,
-                                                            cloud, kdtree,
+                                                            std::ref(cloud), std::ref(kdtree),
                                                             origin_w);
 
 		// return current bestPoint to the upper stack if the lerp distance is less than 1000.0f (default)

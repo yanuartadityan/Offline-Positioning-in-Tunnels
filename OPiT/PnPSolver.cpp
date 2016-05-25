@@ -63,22 +63,6 @@ int PnPSolver::run(int verbalOutput)
 
 
 
-
-	/*
-	recoverPose() described here: http://docs.opencv.org/3.0-beta/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#recoverpose
-	*/
-	// recoverPose(
-	// 	essentialMatrix,
-	// 	VoVImagePoints[0],
-	// 	VoVImagePoints[1],
-	// 	R,
-	// 	t,
-	// 	cameraMatrix.at<double>(0, 0),
-	// 	Point2d(cameraMatrix.at<double>(0, 2), cameraMatrix.at<double>(1, 2)),
-	// 	mask
-	// 	);
-
-
 	Mat inliers;
 	/*
 	solvePnPRansac(): Finds an object pose from 3D-2D point correspondences using the RANSAC scheme.
@@ -140,8 +124,6 @@ int PnPSolver::run(int verbalOutput)
 		double *p = cameraPose.ptr<double>(3);
 		p[0] = p[1] = p[2] = 0; p[3] = 1;
 
-
-
 		/* undistortPoints giving some funny results, not sure how to use it
 
 		vector<Point2f> uImagePoints;
@@ -177,7 +159,6 @@ int PnPSolver::run(int verbalOutput)
 
 		//cameraPosition = -1 * rMat.t() * tVec;
 		PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
-
 		camPositions.push_back(PnPSolver::cameraPosition.clone());
 
 		/*

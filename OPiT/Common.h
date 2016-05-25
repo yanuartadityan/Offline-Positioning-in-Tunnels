@@ -36,8 +36,9 @@ public:
     //preparemap
     void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile, vector<Point2d> &tunnel2Dx, vector<Point3d> &tunnel3Dx, Mat &tunnelDescriptor);
     void updatelut (vector<Point3d>, Mat, vector< pair<Point3d, Mat> > &);
-    void threading(int numofthreads, Mat T, Mat K, vector<KeyPoint> detectedkpts, Mat descriptor, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
-                           vector<pair<Point3d, Mat> > &lookuptable, vector<Point3d> &tunnel3D, vector<Point2d> &tunnel2D, vector<int> &tunnel1D);
+    void threading( int numofthreads, Mat T, Mat K, vector<KeyPoint> detectedkpts, Mat descriptor,
+                    pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree,
+                    vector<pair<Point3d, Mat> > &lookuptable, vector<Point3d> &tunnel3D, vector<Point2d> &tunnel2D, vector<int> &tunnel1D);
     Mat getdescriptor (vector< pair<Point3d, Mat> >);
 
 private:

@@ -320,7 +320,6 @@ ModelManifest.xml
 /OPiT/cloud-early.pcd
 /OPiT/results.txt
 /OPiT/gnistangtunneln-semifull-voxelized.pcd
-<<<<<<< HEAD
 /OPiT/cvsba-1.0.0/utils/test_cvsba.cpp
 /OPiT/cvsba-1.0.0/utils/readparams.h
 /OPiT/cvsba-1.0.0/utils/readparams.c
@@ -354,5 +353,3 @@ ModelManifest.xml
 /OPiT/logs/reprojectionBackup.txt
 /OPiT/logs/PnPSolverBackup.txt
 /OPiT/logs/mainBackup.txt
-=======
->>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de

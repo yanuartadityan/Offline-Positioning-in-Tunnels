@@ -35,15 +35,16 @@ public:
     //preparemap
     void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile, vector<Point2d> &tunnel2Dx, vector<Point3d> &tunnel3Dx, Mat &tunnelDescriptor);
     void updatelut (vector<Point3d>, Mat, vector< pair<Point3d, Mat> > &);
-    void threading(int numofthreads, Mat T, Mat K, vector<KeyPoint> detectedkpts, Mat descriptor, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
-                           vector<pair<Point3d, Mat> > &lookuptable, vector<Point3d> &tunnel3D, vector<Point2d> &tunnel2D, vector<int> &tunnel1D);
+    void threading(int numofthreads, Mat T, Mat K, vector<KeyPoint> detectedkpts, Mat descriptor,
+                   pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
+                   vector<pair<Point3d, Mat> > &lookuptable, vector<Point3d> &tunnel3D, vector<Point2d> &tunnel2D, vector<int> &tunnel1D);
     Mat getdescriptor (vector< pair<Point3d, Mat> >);
 
 private:
     high_resolution_clock::time_point t1, t2;
     mutex                  g_mutex;
-    void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
-                    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+    void calcBestPoint ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
+                    pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
                     int start, int end, int tidx,
                     vector<pair<Point3d, Mat> > &vocabulary,
                     vector<Point3d> &projected3D,

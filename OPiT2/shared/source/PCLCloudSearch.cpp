@@ -12,7 +12,7 @@
 #include "PCLCloudSearch.h"
 
 
-std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double z, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
+std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double z, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree)
 {
 	pcl::PointXYZ searchPoint;
 
@@ -56,8 +56,8 @@ std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double 
 }
 
 std::vector<double> PCLCloudSearch::FindClosestPointRadius(double x, double y, double z, double radius, double threshold,
-                                                           pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                                                           pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+                                                           pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+                                                           pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree,
                                                            cv::Mat origin)
 {
 	pcl::PointXYZ searchPoint;

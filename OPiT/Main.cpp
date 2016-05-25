@@ -5,7 +5,6 @@
 
 
 */
-
 //OPENCV
 #include <opencv2/features2d.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -33,22 +32,21 @@
 #include <mutex>
 #include <chrono>
 #include <fstream>
+#include <cmath>
 
 using namespace std;
 using namespace cv;
 
-const int NR_OF_FRAMES = 15;
+const int NR_OF_FRAMES = 25;
 const int FIRST_INDEX = 433, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
-const int NUMBEROFTHREADS = 8;
+const int CLEARING_PERIODICITY = 5;
+
+const int NUMBEROFTHREADS = 16;
 
 const bool PAR_MODE = true;
 static const bool DRAWKPTS = true;
 
 std::mutex global_mutex;
-
-vector<Point2d>             tunnel2D;
-vector<Point3d>             tunnel3D;
-Mat                         tunnelDescriptor;
 
 /*
 *	Update the Look Up Table for what descriptor belongs to which image point
@@ -87,6 +85,7 @@ int main(int argc, char** argv)
 	Common com;
 
 	ofstream logFile;
+	com.createDir("logs");
 	logFile.open("logs/cameraPositions.txt", std::ios::app);
 	logFile << endl << endl << "Camera Positions:" << endl << endl << "[ " << flush;
 
@@ -173,32 +172,6 @@ int main(int argc, char** argv)
 		Mat R = solver1.getRotationMatrix();
 		Mat t = solver1.getTranslationVector();
 
-		/*
-		*	To prevent the LUT from growing too big and possibly match against too old entries,
-		*		we periodically clear the first half.
-		*/
-		vector< pair<Point3d, Mat> > tempLUT;
-		vector< pair<Point3d, Mat> >::iterator halfwayItr = _3dToDescriptorVector.begin() + _3dToDescriptorVector.size() / 2;
-		vector< pair<Point3d, Mat> >::iterator endItr = _3dToDescriptorVector.end();
-		clearingCounter++;
-		if (clearingCounter == 5)
-		{
-			cout << "Clearing the LUT..." << endl;
-			clearingCounter = 0;
-
-			tempLUT.insert(tempLUT.end(),
-				make_move_iterator(halfwayItr),
-				make_move_iterator(endItr));
-
-			_3dToDescriptorVector.clear();
-
-			_3dToDescriptorVector = move(tempLUT);
-
-			tempLUT.clear();
-
-			cout << "New size of LUT: " << _3dToDescriptorVector.size() << endl;
-		}
-
 		// Keep track of all our threads
 		begin = std::chrono::high_resolution_clock::now();
 		cout << "Performing backprojection of " << descriptors1.rows << " descriptors... ";
@@ -213,7 +186,7 @@ int main(int argc, char** argv)
 		{
 			cout << "Running multithreaded..." << endl;
 
-			com.threading(NUMBEROFTHREADS, T, K, keypoints1, descriptors1, cloud, kdtree,
+			com.threading(NUMBEROFTHREADS, T, K, keypoints1, descriptors1, std::ref(cloud), std::ref(kdtree),
 							ref(_3dToDescriptorVector),
 							ref(projectedWorldpoints),
 							ref(projectedKeypoints),
@@ -274,7 +247,42 @@ int main(int argc, char** argv)
 		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl << endl;
 
 		cout << "Size of our LUT: " << endl << _3dToDescriptorVector.size() << endl;
-		cout << "Camera Position:" << endl << solver2.getCameraPosition() << endl;
+
+		/*
+		DEBUGGING STUFF
+		*/
+
+
+		cout << "Camera Position:" << endl << solver1.getCameraPosition() << endl;
+
+
+
+		/*
+		*	To prevent the LUT from growing too big and possibly match against too old entries,
+		*		we periodically everything but the last frame's backprojection results.
+		*/
+		vector< pair<Point3d, Mat> > tempLUT(projectedIndex.size());
+		if (++clearingCounter == CLEARING_PERIODICITY)
+		{
+			cout << "Clearing the LUT... Last number of successful backprojections was " << projectedIndex.size() << endl;
+			clearingCounter = 0;
+
+            auto diff = abs(int(projectedIndex.size() - _3dToDescriptorVector.size()));
+            
+//			int diff = abs(projectedIndex.size() - _3dToDescriptorVector.size());
+			vector< pair<Point3d, Mat> >::iterator begIt = _3dToDescriptorVector.begin();
+
+			move(( begIt + diff), _3dToDescriptorVector.end(), tempLUT.begin());
+
+			_3dToDescriptorVector.erase(_3dToDescriptorVector.begin());
+
+			move(tempLUT.begin(), tempLUT.end(), _3dToDescriptorVector.begin());
+
+			tempLUT.erase(tempLUT.begin());
+
+			cout << "New size of LUT: " << _3dToDescriptorVector.size() << endl;
+
+		}
 
 		// 15. check reprojection error of each backprojected world points
 		vector<Point2d> reprojectedPixels;
@@ -326,12 +334,14 @@ int main(int argc, char** argv)
 						translationMatrices,
 						distCoeffMatrices);
 
+
 		cout << " Done!" << endl;
 		auto end = std::chrono::high_resolution_clock::now();
 		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms)" << endl << endl;
+
 		*/
 		/*
-		*		Let's print all the calculated camera positions!
+		*		Let's print all the calculated camera positions to a log file!
 		*/
 		Mat pos = solver1.getCameraPosition();
 		logFile << setprecision(10)
@@ -352,14 +362,10 @@ int main(int argc, char** argv)
 	auto endOfMain = std::chrono::high_resolution_clock::now();
 	cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(endOfMain - beginningOfMain).count() << " ms)" << endl << endl;
 
-
 	double sum = 0;
 	for (double err : reprojectionErrors)
 		sum += err;
 	cout << "Average reprojection error: " << sum / reprojectionErrors.size() << endl;
-
-
-
 
 	logFile.close();
 
