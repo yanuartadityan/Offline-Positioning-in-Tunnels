@@ -155,7 +155,7 @@ void Common::threading( int numofthreads, Mat T, Mat K, vector<KeyPoint> detecte
     {
         int start = tidx    * numtask;
         int end   = (tidx+1)* numtask;
-        workers.push_back(thread(&Common::calcBestPoint,  T, K, detectedkpts, descriptor, std::ref(cloud), std::ref(kdtree),
+        workers.push_back(thread(&Common::calcBestPoint,  this, T, K, detectedkpts, descriptor, std::ref(cloud), std::ref(kdtree),
                                                           start, end, tidx,
                                                           std::ref(lookuptable), std::ref(tunnel3D), std::ref(tunnel2D), std::ref(tunnel1D)));
     }

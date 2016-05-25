@@ -44,13 +44,13 @@ public:
 private:
     high_resolution_clock::time_point t1, t2;
     mutex                  g_mutex;
-    void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
-                    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
-                    int start, int end, int tidx,
-                    vector<pair<Point3d, Mat> > &vocabulary,
-                    vector<Point3d> &projected3D,
-                    vector<Point2d> &projected2D,
-                    vector<int> &projectedIndex);
+    void calcBestPoint ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
+                            pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
+                            int start, int end, int tidx,
+                            vector<pair<Point3d, Mat> > &vocabulary,
+                            vector<Point3d> &projected3D,
+                            vector<Point2d> &projected2D,
+                            vector<int> &projectedIndex);
     vector<thread> workers;
 };
 
