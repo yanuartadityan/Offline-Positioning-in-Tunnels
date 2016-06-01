@@ -33,12 +33,11 @@ FeatureDetection::FeatureDetection()
 	min_hessian = 200;
 	octave_layer = 3;
 	contrast_threshold = 0.01;			// default 0.04, lower value more features
-	contrast_threshold = 0.02;			// default 0.04, lower value more features
 	edge_threshold = 10;				// default 10, higher value more features
 	sigma = 1.6;
 
 	// sift
-	sift_matching_ratio = 0.6;
+	sift_matching_ratio = 0.7;
 
 	//detector
 	fastdetect_ = FastFeatureDetector::create(
@@ -73,6 +72,18 @@ FeatureDetection::FeatureDetection()
 FeatureDetection::~FeatureDetection()
 {
     // TODO Auto-generated destructor stub
+}
+
+void FeatureDetection::setSiftParam(int octave, double contrastThreshold, double edgeThreshold, double sigma, double ratio)
+{
+	this->octave_layer				= octave;
+    this->contrast_threshold		= contrastThreshold;
+    this->edge_threshold 			= edgeThreshold;
+    this->sigma						= sigma;
+    this->sift_matching_ratio		= ratio;
+
+	// reupdate the SIFT
+	siftdetect_ = cv::xfeatures2d::SIFT::create(0, octave_layer, contrast_threshold, edge_threshold, sigma);
 }
 
 void FeatureDetection::computeKeypointsAndDraw(char *pathname)
@@ -227,7 +238,29 @@ void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> de
 void FeatureDetection::bfMatcher (cv::Mat queryDesc, cv::Mat trainDesc, std::vector<std::vector<DMatch> > &matches)
 {
 	// matching using BF L2
-	matcher_->knnMatch(queryDesc, trainDesc, matches, 10);
+	matcher_->knnMatch(queryDesc, trainDesc, matches, 2);
+}
+
+void FeatureDetection::ratioTest (vector<vector<DMatch> > &matches, vector<int> &retrieved3D, vector<int> &retrieved2D)
+{
+	for (int i=0; i<matches.size(); i++)
+	{
+		// get the closest neighbour (index 0 always gives the closest descriptor)
+		DMatch first = matches[i][0];
+
+		// compare the L2 distance between the closest and the 2nd-closest
+		auto dist1 = matches[i][0].distance;
+		auto dist2 = matches[i][1].distance;
+
+		// if the 2nd-closest distance is less than the Lowe's ratio (default 0.8)
+		if (dist1 < this->getSiftMatchingRatio() * dist2)
+		{
+			// the 3D points are from the query (lookup table)
+			retrieved3D.push_back(first.queryIdx);
+			// the 2D points are from current frame keypoints
+			retrieved2D.push_back(first.trainIdx);
+		}
+	}
 }
 
 void FeatureDetection::drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output)
@@ -249,13 +282,13 @@ void FeatureDetection::computeFeaturesAndMatching(Mat img, vector<Point2d> tunne
                                                   vector<Point2d> *retrieved2D, vector<Point3d> *retrieved3D)
 {
     Mat img_maskUpperPart = Mat::zeros(img.size(), CV_8U);
-    Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows/2));
+    Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows*7/8));
     img_roiUpperPart = Scalar(255, 255, 255);
-	Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
-	Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows/2, img.cols*2/5, img.rows*2/5));
-	img_roiRightPart = Scalar(255, 255, 255);
-	Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
-    this->siftDetector(img, *detectedkpts, img_combinedMask);
+//	Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
+//	Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows/2, img.cols*2/5, img.rows*2/5));
+//	img_roiRightPart = Scalar(255, 255, 255);
+//	Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
+    this->siftDetector(img, *detectedkpts, img_maskUpperPart);
     this->siftExtraction(img, *detectedkpts, *descriptor);
     vector<vector<DMatch> > matches;
     this->bfMatcher(tunnelDescriptor, *descriptor, matches);

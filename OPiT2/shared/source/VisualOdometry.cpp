@@ -14,8 +14,8 @@ using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
 
-#define STARTFRAME  432
-#define MAXFRAME    532
+#define STARTFRAME  10
+#define MAXFRAME    600
 
 /*
     A class for implementing visual odometry.
@@ -530,7 +530,7 @@ void VO::initParameter()
 
     /* 0 - fast,  1 - sift, 2 - surf,    3 - lukaskanade
        4 - akaze, 5 - orb,  6 - fastsift */
-    vo_method = 1;
+    vo_method = 0;
 
     // fast
     fast_threshold = 20;

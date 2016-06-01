@@ -1,223 +1,220 @@
-#include <opencv2/features2d.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/videoio.hpp>
+// Test-bundle.cpp
+//  a main .cpp file for testing whole solution and bundle adjustment at once
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <chrono>
+#include <numeric>
+
 #include <opencv2/opencv.hpp>
+
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
-#include "FeatureDetection.h"
-#include "Calibration.h"
-#include "PnPSolver.h"
-#include "PointProjection.h"
-#include "PCLCloudSearch.h"
-#include "Reprojection.h"
-#include "BundleAdjust.h"
+
+//  include all class files
 #include "Common.h"
-#include <iostream>
-#include <fstream>
-#include <numeric>
-#include <chrono>
-#include <mutex>
-#define STARTIDX          433
-#define FINISHIDX         523
-#define WINDOWSIZE        1
-#define NUMTHREADS        8
-#define STATICNTASK       480
-#define DRAWKPTS          1
-#define SEQMODE           0
+#include "Frame.h"
+#include "FeatureDetection.h"
+#include "PnPSolver.h"
+#include "Calibration.h"
+#include "BundleAdjust.h"
+
+//  all definitions of variables
+#define WINDOWSIZE              1                       // number of tracked frames every timestep
+#define NUMTHREADS              8                       // number of threads spawned for backprojections
+#define PNPITERATION            1000                    // number of iteration for pnp solver
+#define PNPPIXELERROR           5                       // toleration of error pin pixel square
+#define PNPCONFIDENCE           0.99                    // confidence level of 99%
+#define LENGTHFRAME             50                      // number of processed frames
+#define MINFRAMEIDX             433                     // default frame index
+#define MAXFRAMEIDX             MINFRAMEIDX+LENGTHFRAME // default frame index + length
+#define MINCORRESPONDENCES      6                       // minimum amount of 3D-to-2D correspondencs of PnP
+
+//  all namespaces
 using namespace std;
 using namespace cv;
 using namespace pcl;
-using namespace std::chrono;
 
-/* -------------------------------------themaincaller---------------------------------------*/
-int main (int argc, char *argv[])
+// path to the cloud, tunnel initial correspondences and image sequences
+const string cloudPath   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/gnistangtunneln-semifull-voxelized.pcd";
+const string map2Dto3D   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.txt";
+const string mapDesc     = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.yml";
+const string imgPath     = "/Users/januaditya/Thesis/exjobb-data/volvo/tunnel-frames/";
+
+//  start the main
+int main (int argc, char* argv[])
 {
-    vector<pair<Point3d, Mat> >     lookuptable;
-    vector<Point3d>                 tunnel3D;
-    vector<Point2d>                 tunnel2D;
-    vector<int>		                tunnel1D;
-    Mat                             tunnelDescriptor;
-
-    Calibration cal;
-    PnPSolver pnp(1000, 5, 0.99);
-    PnPSolver pnprefined(1000, 5, 0.99);
-    FeatureDetection feat;
-    BundleAdjust ba;
+    // declare all the class objects
     Common com;
+    FeatureDetection fdet;
+    PnPSolver solver, solverRefined;
+    Calibration cal;
+    BundleAdjust bundle;
 
-    int startFrame, lastFrame;
-    ofstream logFile, logMatrix, correspondences, correspondencesRefined;
-    if (argc == 3) {startFrame = atoi(argv[1]);lastFrame  = atoi(argv[2]);}
-    else {startFrame = STARTIDX;lastFrame = FINISHIDX;}
+    // declare all variables for global lookup table
+    vector<pair<Point3d, Mat> >     _3dToDescriptorTable;
 
-    char poseFileIdx[100]; char poseRefinedFileIdx[100];
-    if (LOGMODE)
-    {
-        com.createDir("log");
+    // declare all variables for local frame information
+    vector<Point3d>                 _tunnel3D;
+    vector<Point2d>                 _tunnel2D;
+    Mat                             _tunnelDescriptor;
 
-        // create a file for logging posiions
-        logFile.open ("./log/logPoses.txt", std::ios::out);
-        logMatrix.open ("./log/logMatrix.txt", std::ios::out);
-    }
+    // set class objects initial parameters
+    solver.setPnPParam (PNPITERATION, PNPPIXELERROR, PNPCONFIDENCE);
 
-    char map2Dto3D  [100]; char mapDescrip [100];
-    sprintf(map2Dto3D, "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.txt");
-    sprintf(mapDescrip,"/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.yml");
-    com.prepareMap(map2Dto3D, mapDescrip, ref(tunnel2D), ref(tunnel3D), ref(tunnelDescriptor));
-    com.updatelut(tunnel3D, tunnelDescriptor, ref(lookuptable));
-    PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);
-    io::loadPCDFile("/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/gnistangtunneln-semifull-voxelized.pcd", *cloud);
-    std::cerr << "cloud: " << cloud->width * cloud->height << " points (" << pcl::getFieldsList (*cloud) << ")" << std::endl;
+    // point cloud variables
+    int startFrame, endFrame;                                   // marks index for frame start/end
+    PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);  // pointer to the cloud
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-    kdtree.setInputCloud(cloud);
-    char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/out0/";
-    char nextimage[100];
-    Mat T, K;
-    int frameIdx = startFrame;
-    int frameCounter = 0;
 
-    while (frameIdx < lastFrame)
+    // handle the input arguments
+    if (argc !=3)
     {
-        if (LOGMODE)
-        {
-            sprintf(poseFileIdx, "./log/%d-poseFile.txt", frameIdx);
-            sprintf(poseRefinedFileIdx, "./log/%d-poseRefined.txt", frameIdx);
+        cout << "running the simulation for " << LENGTHFRAME << " frames" << endl;
+        cerr << "wrong number of input arguments..." << endl;
+        cerr << "using default parameter instead..." << endl;
 
-            correspondences.open(poseFileIdx, std::ios::out);
-            correspondencesRefined.open(poseRefinedFileIdx, std::ios::out);
-        }
-
-        com.startTimer();
-        if (frameCounter > 0) pnp.setPnPParam(1000, 5, 0.99);
-        sprintf(nextimage, "%simg_%05d.png", pathname, frameIdx);
-        cout << "processing frame-" << frameIdx << endl;
-
-        // load the image
-        Mat img = imread(nextimage);
-        vector<Point2d> retrieved2D; vector<Point3d> retrieved3D; vector<KeyPoint> detectedkpts; Mat descriptor;
-        Mat desc = com.getdescriptor(lookuptable);
-
-        // perform the roi, feature matching and returns data from the lookuptable
-        feat.computeFeaturesAndMatching(img,tunnel2D,tunnel3D,desc,frameCounter,&detectedkpts,&descriptor,&retrieved2D,&retrieved3D);
-
-        if (LOGMODE)
-        {
-            for (int i=0; i<retrieved2D.size(); i++)
-            {
-               correspondences << std::fixed << setprecision(4)
-                               << retrieved3D[i].x << ", "
-                               << retrieved3D[i].y << ", "
-                               << retrieved3D[i].z << ", " << std::flush;
-
-               correspondences << std::fixed << setprecision(4)
-                               << retrieved2D[i].x << ", "
-                               << retrieved2D[i].y << "\n" << std::flush;
-            }
-        }
-
-        // solve the camera pose and returns R, K, t
-        pnp.setImagePoints(retrieved2D); pnp.setWorldPoints(retrieved3D); pnp.run(1);
-        T = pnp.getCameraPose().clone(); K = cal.getCameraMatrix();
-        Mat R = pnp.getRotationMatrix(); Mat t = pnp.getTranslationVector();
-
-        // save the initial camera pose for frame-idx
-        if (LOGMODE)
-        {
-            // save the initial camera position
-            logFile << std::fixed << setprecision(10)
-                    << T.at<double>(0,3) << ", "
-                    << T.at<double>(1,3) << ", "
-                    << T.at<double>(2,3) << ", " << std::flush;
-
-            // save the initial Rotation and Translation matrices from PnP solver
-            logMatrix << std::fixed << setprecision(10)
-                      << R.at<double>(0,0) << ", " << R.at<double>(0,1) << ", " << R.at<double>(0,2) << ", "
-                      << R.at<double>(1,0) << ", " << R.at<double>(1,1) << ", " << R.at<double>(1,2) << ", "
-                      << R.at<double>(2,0) << ", " << R.at<double>(2,1) << ", " << R.at<double>(2,2) << ", "
-                      << t.at<double>(0)   << ", " << t.at<double>(1)   << ", " << t.at<double>(2)   << ", " << std::flush;
-        }
-
-        // TODO: a line that changes everything | clear the lut
-        tunnel1D.clear(); tunnel2D.clear(); tunnel3D.clear();tunnelDescriptor.release();lookuptable.clear();
-
-        // multithread backprojection
-        com.threading(NUMTHREADS, T, K, detectedkpts, descriptor, std::ref(cloud), std::ref(kdtree), std::ref(lookuptable), std::ref(tunnel3D), std::ref(tunnel2D), std::ref(tunnel1D));
-
-        // refine the camera pose
-        pnprefined.setImagePoints(tunnel2D); pnprefined.setWorldPoints(tunnel3D); pnprefined.run(1);
-
-        // test for the reprojection error
-        vector<Point2d> reprojectedPixels;
-        projectPoints(tunnel3D,pnp.getRotationMatrix(),pnp.getTranslationVector(),cal.getCameraMatrix(),cal.getDistortionCoeffs(),reprojectedPixels);
-        double repError = 0;
-        for (int itx = 0; itx < tunnel1D.size(); itx++)
-        {
-            double dx, dy;
-            dx = pow(abs(reprojectedPixels[itx].x - detectedkpts[tunnel1D[itx]].pt.x), 2);
-            dy = pow(abs(reprojectedPixels[itx].y - detectedkpts[tunnel1D[itx]].pt.y), 2);
-            repError += sqrt(dx + dy);
-        }
-        cout << "  lut size is " << tunnel3D.size() << endl;
-        cout << "  avg reprojection error for " << tunnel1D.size() << " points is: " << repError/tunnel1D.size() << " px " << endl;
-
-        // save the refined initial camera pose for frame-idx
-        if (LOGMODE)
-        {
-            // save the 3D-to-2D correspondences
-            for (int i=0; i<tunnel2D.size(); i++)
-            {
-                correspondencesRefined << std::fixed << setprecision(4)
-                                       << tunnel3D[i].x << ", "
-                                       << tunnel3D[i].y << ", "
-                                       << tunnel3D[i].z << ", " << std::flush;
-
-                correspondencesRefined << std::fixed << setprecision(4)
-                                       << tunnel2D[i].x << ", "
-                                       << tunnel2D[i].y << "\n" << std::flush;
-            }
-
-            // save the refined vehicle position, num of keypoints, num of backprojected points and reprojection error
-            T = pnprefined.getCameraPose().clone();
-
-            logFile << std::fixed << setprecision(10)
-                    << T.at<double>(0,3) << ", "
-                    << T.at<double>(1,3) << ", "
-                    << T.at<double>(2,3) << ", " << std::flush;
-
-            logFile << std::fixed << setprecision(10)
-                    << detectedkpts.size()       << ", "
-                    << tunnel3D.size()           << ", "
-                    << repError/tunnel1D.size()  << "\n" << std::flush;      // end of logPose
-
-            // save the Rotation and Translation matrices
-            R = pnprefined.getRotationMatrix();
-            t = pnprefined.getTranslationVector();
-
-            logMatrix << std::fixed << setprecision(10)
-                      << R.at<double>(0,0) << ", " << R.at<double>(0,1) << ", " << R.at<double>(0,2) << ", "
-                      << R.at<double>(1,0) << ", " << R.at<double>(1,1) << ", " << R.at<double>(1,2) << ", "
-                      << R.at<double>(2,0) << ", " << R.at<double>(2,1) << ", " << R.at<double>(2,2) << ", "
-                      // end of logMatrix
-                      << t.at<double>(0)   << ", " << t.at<double>(1)   << ", " << t.at<double>(2)   << "\n" << std::flush;
-        }
-
-        // TODO: a line that impacts the thesis enormously
-        if (ba.getWindowSize() < WINDOWSIZE) ba.pushFrame(tunnel2D, tunnel3D, K, pnp.getRotationMatrix(), pnp.getTranslationVector(), cal.getDistortionCoeffs());
-
-        // close the file
-        if (LOGMODE)
-        {
-           correspondences.close();
-           correspondencesRefined.close();
-        }
-
-        com.reportTimer();
-        frameIdx++; frameCounter++;
+        startFrame = MINFRAMEIDX;
+        endFrame   = MAXFRAMEIDX;
+     }
+    else
+    {
+        startFrame = atoi(argv[1]);
+        endFrame   = atoi(argv[2]);
+        cout << "running the simulation for " << endFrame - startFrame << " frames" << endl;
     }
 
-    // close the i/o
-    logFile.close();
-    logMatrix.close();
+    // load the point cloud, create kd-tree, and report the cloud dimension
+    io::loadPCDFile(cloudPath, *cloud);
+    kdtree.setInputCloud(cloud);
+    cout << "loaded cloud with " << cloud->width * cloud->height << " points ("
+         << getFieldsList (*cloud) << ")" << endl;
+
+    // prepare the 2D, 3D and descriptor correspondences from files and initialise the lookuptable
+    com.prepareMap(map2Dto3D, mapDesc, ref(_tunnel2D), ref(_tunnel3D), ref(_tunnelDescriptor));
+    com.updatelut(_tunnel3D, _tunnelDescriptor, ref(_3dToDescriptorTable));
+
+    // init all objects and vars for the main sequences, in order of definition
+    int frameIndex = startFrame;
+    int frameCount = 0;
+    char currImgPath[100];
+    vector<Frame> trackedFrame;
+
+    // start the positioning sequences
+    while (frameIndex < endFrame)
+    {
+        // create local object of frame and automatically cleared every new iteration
+        Frame current;
+        Frame prev;
+        vector<int> matchesIndex3D;
+        vector<int> matchesIndex2D;
+
+        // load the image into the current frame
+        sprintf(currImgPath, "%simg_%05d.png", imgPath.c_str(), frameIndex);
+
+        current.frameIdx = frameCount;
+        current.image    = imread(currImgPath);
+
+        // preprocess the image to remove visible outliers, e.g. dashboard
+        Mat mask = Mat::zeros(current.image.size(), CV_8U);
+        Mat roi (mask, Rect(0, 0, current.image.cols, current.image.rows*7/8));
+        roi = Scalar(255, 255, 255);
+
+        // detect features from current frame with provided region of interest mask
+        fdet.siftDetector(current.image, current.keypoints, mask);
+
+        // extract feature descriptors from current frame
+        fdet.siftExtraction(current.image, current.keypoints, current.descriptors);
+
+        // match descriptors with the lookup table, return the 3D points if good matches are found
+        Mat lutDesc = com.getdescriptor(_3dToDescriptorTable);
+        fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
+
+        // perform David Lowe's ratio test. it gives 3D/2D indices to use in the next step
+        fdet.ratioTest(current.matches, ref(matchesIndex3D), ref(matchesIndex2D));
+
+        // retrieve the 3D from the lookup table, 2D from current frame's keypoints
+        if (matchesIndex2D.size() != matchesIndex3D.size())
+            cerr << "wrong size of 2D/3D correspondences" << endl;
+        else
+        {
+            for (int i=0; i<matchesIndex2D.size(); i++)
+            {
+                current.matchedWorldPoints.push_back(Point3d(_3dToDescriptorTable[matchesIndex3D[i]].first.x,
+                                                             _3dToDescriptorTable[matchesIndex3D[i]].first.y,
+                                                             _3dToDescriptorTable[matchesIndex3D[i]].first.z));
+                current.matchedImagePoints.push_back(Point2d(current.keypoints[matchesIndex2D[i]].pt.x,
+                                                             current.keypoints[matchesIndex2D[i]].pt.y));
+            }
+        }
+
+        // once we got the 3D and 2D correspondences and bigger than min correspondences, compute the camera pose
+        if (current.matchedWorldPoints.size() < MINCORRESPONDENCES)
+        {
+            cerr << "not enough correspondences for PnP" << endl;
+            exit(EXIT_FAILURE);
+        }
+        else
+        {
+            solver.setImagePoints(current.matchedImagePoints);
+            solver.setWorldPoints(current.matchedWorldPoints);
+            solver.run(1);
+        }
+
+        // find the rest image points 3D representation using backprojections
+
+        // prepare the matrices
+        current.K           = cal.getCameraMatrix();
+        current.distCoef    = cal.getDistortionCoeffs();
+        current.cameraPose  = solver.getCameraPose();
+        current.R           = solver.getRotationMatrix();
+        current.R_rodrigues = solver.getRotationVector();
+        current.t           = solver.getTranslationVector();
+
+        // call the multithreaded backprojection wrapper
+        com.threading(NUMTHREADS,
+                      current.cameraPose,
+                      current.K,
+                      current.keypoints,
+                      current.descriptors,
+                      std::ref(cloud),
+                      std::ref(kdtree),
+                      std::ref(_3dToDescriptorTable),
+                      std::ref(current.reprojectedWorldPoints),
+                      std::ref(current.reprojectedImagePoints),
+                      std::ref(current.reprojectedIndices));
+
+        // calculate the camera pose again using successfully backprojected points
+        solverRefined.setPnPParam (PNPITERATION, PNPPIXELERROR, PNPCONFIDENCE);
+        solverRefined.setWorldPoints(current.reprojectedWorldPoints);
+        solverRefined.setImagePoints(current.reprojectedImagePoints);
+        solverRefined.run(1);
+
+        // push frame into the window
+        if (trackedFrame.size() < WINDOWSIZE)
+        {
+            // adding the current frame into the window
+            trackedFrame.push_back(current);
+        }
+        else
+        {
+            // clear the first index elements from lookup table
+            _3dToDescriptorTable.erase(_3dToDescriptorTable.begin(), _3dToDescriptorTable.begin() + trackedFrame[0].reprojectedWorldPoints.size());
+
+            // clear the first frame inside window if the window is full
+            trackedFrame.erase(trackedFrame.begin());
+        }
+
+        // now current becomes previous frame
+        // TODO: still don't know how to use previous frame, verification maybe?
+        prev = current;
+
+        // end of sequences, go to the next frameIndex
+        frameIndex++;
+        frameCount++;
+    }
+
+    // end of the main caller
     return 0;
 }

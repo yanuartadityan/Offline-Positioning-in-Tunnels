@@ -13,8 +13,13 @@ class FeatureDetection
 public:
     // constructor
 	FeatureDetection();
+
 	// destructor
     virtual ~FeatureDetection();
+
+	// set SIFT param
+	void setSiftParam(int octave, double contrastThreshold, double edgeThreshold, double sigma, double ratio);
+
 
     // the wrapper
     void computeKeypointsAndDraw(char *pathname);
@@ -31,6 +36,7 @@ public:
 
 	// methods for matching descriptors
     void bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<cv::DMatch> > &matches);
+	void ratioTest (std::vector<std::vector<cv::DMatch> > &, std::vector<int> &, std::vector<int> &);
 
     // draw keypoints
     void drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output);
@@ -62,13 +68,13 @@ private:
 
     // surf param
     int min_hessian;
+
+	// sift param
     int octave_layer;
     double contrast_threshold;
     double edge_threshold;
     double sigma;
-
-    // sift param
-    float sift_matching_ratio;
+    double sift_matching_ratio;
 };
 
 #endif
