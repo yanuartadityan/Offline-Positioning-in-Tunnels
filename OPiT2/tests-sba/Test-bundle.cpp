@@ -21,7 +21,7 @@
 #include "BundleAdjust.h"
 
 //  all definitions of variables
-#define WINDOWSIZE              1                       // number of tracked frames every timestep
+#define WINDOWSIZE              10                       // number of tracked frames every timestep
 #define NUMTHREADS              8                       // number of threads spawned for backprojections
 #define PNPITERATION            1000                    // number of iteration for pnp solver
 #define PNPPIXELERROR           5                       // toleration of error pin pixel square
@@ -101,18 +101,21 @@ int main (int argc, char* argv[])
     char currImgPath[100];
     vector<Frame> trackedFrame;
 
+    Frame current;
+    Frame prev;
+    
     // start the positioning sequences
     while (frameIndex < endFrame)
     {
         // create local object of frame and automatically cleared every new iteration
-        Frame current;
-        Frame prev;
         vector<int> matchesIndex3D;
         vector<int> matchesIndex2D;
 
         // load the image into the current frame
         sprintf(currImgPath, "%simg_%05d.png", imgPath.c_str(), frameIndex);
 
+        // init current Frame
+        current = Frame();
         current.frameIdx = frameCount;
         current.image    = imread(currImgPath);
 
@@ -157,6 +160,10 @@ int main (int argc, char* argv[])
         }
         else
         {
+            // reinit solver
+            solver = PnPSolver();
+            solver.setPnPParam (PNPITERATION, PNPPIXELERROR, PNPCONFIDENCE);
+            
             solver.setImagePoints(current.matchedImagePoints);
             solver.setWorldPoints(current.matchedWorldPoints);
             solver.run(1);
@@ -167,11 +174,53 @@ int main (int argc, char* argv[])
         // prepare the matrices
         current.K           = cal.getCameraMatrix();
         current.distCoef    = cal.getDistortionCoeffs();
-        current.cameraPose  = solver.getCameraPose();
         current.R           = solver.getRotationMatrix();
         current.R_rodrigues = solver.getRotationVector();
         current.t           = solver.getTranslationVector();
+        
+        // get the camera pose matrix (3x4). it consists of camera position and the transposed rotation matrix
+        current.cameraPose  = solver.getCameraPose();
+        
+        // get the transposed/inversed rotation matrix (3x3).
+        // we can copy 3x3 upper left from the cameraPose (3x4) or just take the inverse of rotation matrix
+        current.R_invert    = current.R.inv();
+        
+        // get the camera position (3x1) as t_invert.
+        // the alternative way is to copy 3x1 rightmost column from the cameraPose (3x4)
+        if (frameCount == 0)        // initial frame/camera at index-0
+        {
+            current.t_invert        = (-(current.R_invert) * current.t);
+            current.t_translation   = current.t_invert;
+        }
+        else                        // rest of the frames
+        {
+            Mat currentCamPos       = (-(current.R_invert) * current.t);
+            current.t_invert        = currentCamPos;
+            current.t_translation   = current.t_invert - prev.t_invert;
+        }
 
+        // bundle adjustment start here
+        // we push the information of matched points into the bundle
+        if (bundle.getWindowSize() < WINDOWSIZE)
+        {
+            // add to bundle adjustment
+            bundle.pushFrame(ref(current.matchedImagePoints),
+                             ref(current.matchedWorldPoints),
+                             ref(current.K),
+                             ref(current.R_invert),
+                             ref(current.t_invert),
+                             ref(current.distCoef));
+        }
+        
+        // execute the bundle adjustment for both motion (R|t) and the structures (worldPoints)
+        // after the execution, all frames's motion and worldPoints within sliding window will be optimized
+        if (bundle.getWindowSize() == WINDOWSIZE)
+        {
+            bundle.run();
+            bundle.eraseFirstFrame();
+        }
+
+        
         // call the multithreaded backprojection wrapper
         com.threading(NUMTHREADS,
                       current.cameraPose,
@@ -186,7 +235,9 @@ int main (int argc, char* argv[])
                       std::ref(current.reprojectedIndices));
 
         // calculate the camera pose again using successfully backprojected points
+        solverRefined = PnPSolver();
         solverRefined.setPnPParam (PNPITERATION, PNPPIXELERROR, PNPCONFIDENCE);
+        
         solverRefined.setWorldPoints(current.reprojectedWorldPoints);
         solverRefined.setImagePoints(current.reprojectedImagePoints);
         solverRefined.run(1);
@@ -208,6 +259,7 @@ int main (int argc, char* argv[])
 
         // now current becomes previous frame
         // TODO: still don't know how to use previous frame, verification maybe?
+        prev = Frame();
         prev = current;
 
         // end of sequences, go to the next frameIndex

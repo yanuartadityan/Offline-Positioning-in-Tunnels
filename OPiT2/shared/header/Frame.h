@@ -34,6 +34,9 @@ public:
     Mat                         R;                          // 3x3,         rotation matrix
     Mat                         R_rodrigues;                // 1x3,         rotation vector (rodrigues)
     Mat                         t;                          // 1x3,         translation matrix
+    Mat                         R_invert;                   // 3x3,         this is the transposed of regular R
+    Mat                         t_invert;                   // 1x3,         this is the camera position in the world space
+    Mat                         t_translation;              // 1x3,         represent the translation from previous camera pose
     Mat                         distCoef;                   // 1x5,         distortion coefficients
     Mat                         cameraPose;                 // 3x4,         inverse matrices
 

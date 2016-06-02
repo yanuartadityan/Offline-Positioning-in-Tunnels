@@ -32,7 +32,7 @@ using namespace pcl;
 using namespace std::chrono;
 
 /* -------------------------------------themaincaller---------------------------------------*/
-int main (int argc, char *argv[])
+int MainWrapper (int argc, char *argv[])
 {
     vector<pair<Point3d, Mat> >     lookuptable;
     vector<Point3d>                 tunnel3D;

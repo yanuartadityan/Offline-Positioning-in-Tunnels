@@ -1,4 +1,5 @@
 #include "Common.h"
+#include "Frame.h"
 #include "BundleAdjust.h"
 
 #include <opencv2/features2d.hpp>
@@ -13,7 +14,7 @@ using namespace std;
 using namespace cv;
 
 //#define FLT_THRESHOLD   1.192092896e-07F
-#define FLT_THRESHOLD   0.05            // 1 cm tolerancy
+#define FLT_THRESHOLD    0.025           // 2.5 cm tolerancy
 
 /* ---------------------------------------------------------------------------------------------------------
     bunch of methods for removing the duplicates in 3D-to-2D correspondences
@@ -95,7 +96,7 @@ BundleAdjust::BundleAdjust()
     this->sba.setParams(params);
 }
 
-void BundleAdjust::pushFrame(vector<Point2d> image2D, vector<Point3d> image3D, Mat K, Mat Rvec, Mat tvec, Mat dist)
+void BundleAdjust::pushFrame(vector<Point2d> &image2D, vector<Point3d> &image3D, Mat &K, Mat &Rvec, Mat &tvec, Mat &dist)
 {
     frameInfo temp;
     temp.imagePoints    = image2D;
@@ -136,9 +137,9 @@ void BundleAdjust::prepareData(vector<Point3d> &points3D,
     }
     
     // check duplicates of 3D points to some very small threshold and erase the duplicate
-//    std::sort(points3D.begin(), points3D.end(), comparePoint3D);
-//    auto unique_end = std::unique(points3D.begin(), points3D.end(), equalPoint3D);
-//    points3D.erase(unique_end, points3D.end());
+    std::sort(points3D.begin(), points3D.end(), comparePoint3D);
+    auto unique_end = std::unique(points3D.begin(), points3D.end(), equalPoint3D);
+    points3D.erase(unique_end, points3D.end());
 
     // allocate 2D vectors
     visibility.resize(getWindowSize());
@@ -154,8 +155,6 @@ void BundleAdjust::prepareData(vector<Point3d> &points3D,
             pointsImg[i][j].y = std::numeric_limits<float>::quiet_NaN();
         }
     }
-    
-    
     
     // check visibility by checking each elements inside points3D and returns visibility mask and corresponding
     // 2d feature points (for each frame)
@@ -192,28 +191,54 @@ void BundleAdjust::prepareData(vector<Point3d> &points3D,
         T.push_back(frameWindows[i].t);
         cameraMatrix.push_back(frameWindows[i].K);
         distCoeffs.push_back((Mat1d(5,1) << 0, 0, 0, 0, 0));
-        
-        // debugging
-        cout << "    R for frame-" << i << endl << frameWindows[i].R << endl;
-        cout << "    rodriguesed to" << endl << rTemp << endl;
-        cout << "    K for frame-" << i << endl << frameWindows[i].K << endl;
     }
 }
 
 void BundleAdjust::run()
 {
-    TermCriteria                    criteria(CV_TERMCRIT_ITER + CV_TERMCRIT_EPS, 150, 1e-10);
+    TermCriteria                    criteria(CV_TERMCRIT_ITER + CV_TERMCRIT_EPS, 1000, 1e-10);
     vector<Point3d>                 points3D;
     vector<vector<cv::Point2d> >    pointsImg;
     vector<vector<int> >            visibility;
     vector<Mat>                     cameraMatrix;
     vector<Mat>                     distCoeffs, R, T;
 
+    for (int i=0; i<5; i++)
+    {
+        std::cout << frameWindows[i].R << std::endl;
+        std::cout << frameWindows[i].t << std::endl;
+        std::cout << std::endl;
+    }
+    
     // prepare the data for the bundle
-    prepareData(points3D, pointsImg, visibility, cameraMatrix, R, T, distCoeffs);
+    prepareData(points3D, pointsImg, ref(visibility), ref(cameraMatrix), ref(R), ref(T), ref(distCoeffs));
 
+//    for (int i=4; i<5; i++)
+//    {
+//        std::cout << cameraMatrix[i] << std::endl;
+//        std::cout << R[i] << std::endl;
+//        std::cout << T[i] << std::endl;
+//        std::cout << distCoeffs[i] << std::endl;
+//        std::cout << std::endl;
+//    }
+    
     // run the sparse bundle adjustment for N-window size
-    double repError = sba.run(points3D, pointsImg, visibility, cameraMatrix, R, T, distCoeffs);
+    double repError = sba.run(ref(points3D),
+                              ref(pointsImg),
+                              ref(visibility),
+                              ref(cameraMatrix),
+                              ref(R),
+                              ref(T),
+                              ref(distCoeffs));
+    
+//    for (int i=4; i<5; i++)
+//    {
+//        std::cout << cameraMatrix[i] << std::endl;
+//        std::cout << R[i] << std::endl;
+//        std::cout << T[i] << std::endl;
+//        std::cout << distCoeffs[i] << std::endl;
+//        std::cout << std::endl;
+//    }
     
     cout << "  reprojection error after bundle adjustment: " << repError << endl;
 }

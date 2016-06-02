@@ -42,7 +42,7 @@ public:
     // void pairFrom3Dto2D (vector<Point3d>, vector<Point2d>, vector<pair<Point3d, Point2d> > &);
     // void removeDuplicate(vector<Point3d> &worldPoints);
 
-    void pushFrame (vector<Point2d>, vector<Point3d>, Mat, Mat, Mat, Mat);
+    void pushFrame (vector<Point2d> &, vector<Point3d> &, Mat &, Mat &, Mat &, Mat &);
     void eraseFirstFrame();
     void run();
     void prepareData(vector<Point3d> &, vector<vector<Point2d> > &, vector<vector<int> > &,
