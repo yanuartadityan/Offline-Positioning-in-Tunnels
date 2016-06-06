@@ -21,7 +21,7 @@
 #include "BundleAdjust.h"
 
 //  all definitions of variables
-#define WINDOWSIZE              10                       // number of tracked frames every timestep
+#define WINDOWSIZE              5                       // number of tracked frames every timestep
 #define NUMTHREADS              8                       // number of threads spawned for backprojections
 #define PNPITERATION            1000                    // number of iteration for pnp solver
 #define PNPPIXELERROR           5                       // toleration of error pin pixel square
@@ -41,6 +41,7 @@ const string cloudPath   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Pos
 const string map2Dto3D   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.txt";
 const string mapDesc     = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.yml";
 const string imgPath     = "/Users/januaditya/Thesis/exjobb-data/volvo/tunnel-frames/";
+//const string imgPath     = "/Users/januaditya/Desktop/thesis/gopro/frames/";
 
 //  start the main
 int main (int argc, char* argv[])
@@ -99,20 +100,23 @@ int main (int argc, char* argv[])
     int frameIndex = startFrame;
     int frameCount = 0;
     char currImgPath[100];
-    vector<Frame> trackedFrame;
+    vector<Frame> windowedFrame;
 
     Frame current;
     Frame prev;
-    
+
     // start the positioning sequences
     while (frameIndex < endFrame)
     {
+        cout << "processing frame-" << frameCount << "..." << endl;
+
         // create local object of frame and automatically cleared every new iteration
         vector<int> matchesIndex3D;
         vector<int> matchesIndex2D;
 
         // load the image into the current frame
         sprintf(currImgPath, "%simg_%05d.png", imgPath.c_str(), frameIndex);
+//        sprintf(currImgPath, "%s%04d.png", imgPath.c_str(), frameIndex);
 
         // init current Frame
         current = Frame();
@@ -130,25 +134,50 @@ int main (int argc, char* argv[])
         // extract feature descriptors from current frame
         fdet.siftExtraction(current.image, current.keypoints, current.descriptors);
 
-        // match descriptors with the lookup table, return the 3D points if good matches are found
-        Mat lutDesc = com.getdescriptor(_3dToDescriptorTable);
-        fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
+        Mat lutDesc;
+        // match the current frame descriptor with every frames in the window
+        if (windowedFrame.size() != 0)
+        {
+            for (int i=windowedFrame.size()-1; i>=0; i--)
+            {
+                // if not empty, then correspondences has to be checked for every frames in the window
+                lutDesc = com.getdescriptor(windowedFrame[i]._3dToDescriptor);
 
-        // perform David Lowe's ratio test. it gives 3D/2D indices to use in the next step
-        fdet.ratioTest(current.matches, ref(matchesIndex3D), ref(matchesIndex2D));
+                // match descriptor
+                fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
 
-        // retrieve the 3D from the lookup table, 2D from current frame's keypoints
-        if (matchesIndex2D.size() != matchesIndex3D.size())
-            cerr << "wrong size of 2D/3D correspondences" << endl;
+                // perform lowe's ratio test, last parameter is for cout verbose (true/false)
+                fdet.ratioTestRansac(current.matches, ref(windowedFrame[i]), ref(current), false);
+            }
+        }
+        // if window empty
         else
         {
-            for (int i=0; i<matchesIndex2D.size(); i++)
+            // if empty, the correspondences are obtained from the lookuptable
+            lutDesc = com.getdescriptor(_3dToDescriptorTable);
+
+            // clean LUT
+            _3dToDescriptorTable.clear();
+
+            // matcher
+            fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
+
+            // perform David Lowe's ratio test. it gives 3D/2D indices to use in the next step
+            fdet.ratioTest(current.matches, ref(matchesIndex3D), ref(matchesIndex2D));
+
+            // retrieve the 3D from the lookup table, 2D from current frame's keypoints
+            if (matchesIndex2D.size() != matchesIndex3D.size())
+                cerr << "wrong size of 2D/3D correspondences" << endl;
+            else
             {
-                current.matchedWorldPoints.push_back(Point3d(_3dToDescriptorTable[matchesIndex3D[i]].first.x,
-                                                             _3dToDescriptorTable[matchesIndex3D[i]].first.y,
-                                                             _3dToDescriptorTable[matchesIndex3D[i]].first.z));
-                current.matchedImagePoints.push_back(Point2d(current.keypoints[matchesIndex2D[i]].pt.x,
-                                                             current.keypoints[matchesIndex2D[i]].pt.y));
+                for (int i=0; i<matchesIndex2D.size(); i++)
+                {
+                    current.matchedWorldPoints.push_back(Point3d(_3dToDescriptorTable[matchesIndex3D[i]].first.x,
+                                                                 _3dToDescriptorTable[matchesIndex3D[i]].first.y,
+                                                                 _3dToDescriptorTable[matchesIndex3D[i]].first.z));
+                    current.matchedImagePoints.push_back(Point2d(current.keypoints[matchesIndex2D[i]].pt.x,
+                                                                 current.keypoints[matchesIndex2D[i]].pt.y));
+                }
             }
         }
 
@@ -160,67 +189,50 @@ int main (int argc, char* argv[])
         }
         else
         {
+            cout << "  found " << current.matchedWorldPoints.size() << " 3D points from lookup table window" << endl;
+            
             // reinit solver
             solver = PnPSolver();
             solver.setPnPParam (PNPITERATION, PNPPIXELERROR, PNPCONFIDENCE);
-            
+
             solver.setImagePoints(current.matchedImagePoints);
             solver.setWorldPoints(current.matchedWorldPoints);
+            cout << "  result after matching...";
             solver.run(1);
         }
 
         // find the rest image points 3D representation using backprojections
 
         // prepare the matrices
-        current.K           = cal.getCameraMatrix();
-        current.distCoef    = cal.getDistortionCoeffs();
-        current.R           = solver.getRotationMatrix();
-        current.R_rodrigues = solver.getRotationVector();
-        current.t           = solver.getTranslationVector();
-        
-        // get the camera pose matrix (3x4). it consists of camera position and the transposed rotation matrix
-        current.cameraPose  = solver.getCameraPose();
-        
-        // get the transposed/inversed rotation matrix (3x3).
-        // we can copy 3x3 upper left from the cameraPose (3x4) or just take the inverse of rotation matrix
-        current.R_invert    = current.R.inv();
-        
-        // get the camera position (3x1) as t_invert.
-        // the alternative way is to copy 3x1 rightmost column from the cameraPose (3x4)
-        if (frameCount == 0)        // initial frame/camera at index-0
         {
-            current.t_invert        = (-(current.R_invert) * current.t);
-            current.t_translation   = current.t_invert;
-        }
-        else                        // rest of the frames
-        {
-            Mat currentCamPos       = (-(current.R_invert) * current.t);
-            current.t_invert        = currentCamPos;
-            current.t_translation   = current.t_invert - prev.t_invert;
+            current.K           = cal.getCameraMatrix();
+            current.distCoef    = cal.getDistortionCoeffs();
+            current.R           = solver.getRotationMatrix();
+            current.R_rodrigues = solver.getRotationVector();
+            current.t           = solver.getTranslationVector();
+
+            // get the camera pose matrix (3x4). it consists of camera position and the transposed rotation matrix
+            current.cameraPose  = solver.getCameraPose();
+
+            // get the transposed/inversed rotation matrix (3x3).
+            // we can copy 3x3 upper left from the cameraPose (3x4) or just take the inverse of rotation matrix
+            current.R_invert    = current.R.inv();
+
+            // get the camera position (3x1) as t_invert.
+            // the alternative way is to copy 3x1 rightmost column from the cameraPose (3x4)
+            if (frameCount == 0)        // initial frame/camera at index-0
+            {
+                current.t_invert        = (-(current.R_invert) * current.t);
+                current.t_translation   = current.t_invert;
+            }
+            else                        // rest of the frames
+            {
+                Mat currentCamPos       = (-(current.R_invert) * current.t);
+                current.t_invert        = currentCamPos;
+                current.t_translation   = current.t_invert - prev.t_invert;
+            }
         }
 
-        // bundle adjustment start here
-        // we push the information of matched points into the bundle
-        if (bundle.getWindowSize() < WINDOWSIZE)
-        {
-            // add to bundle adjustment
-            bundle.pushFrame(ref(current.matchedImagePoints),
-                             ref(current.matchedWorldPoints),
-                             ref(current.K),
-                             ref(current.R_invert),
-                             ref(current.t_invert),
-                             ref(current.distCoef));
-        }
-        
-        // execute the bundle adjustment for both motion (R|t) and the structures (worldPoints)
-        // after the execution, all frames's motion and worldPoints within sliding window will be optimized
-        if (bundle.getWindowSize() == WINDOWSIZE)
-        {
-            bundle.run();
-            bundle.eraseFirstFrame();
-        }
-
-        
         // call the multithreaded backprojection wrapper
         com.threading(NUMTHREADS,
                       current.cameraPose,
@@ -229,32 +241,36 @@ int main (int argc, char* argv[])
                       current.descriptors,
                       std::ref(cloud),
                       std::ref(kdtree),
-                      std::ref(_3dToDescriptorTable),
-                      std::ref(current.reprojectedWorldPoints),
-                      std::ref(current.reprojectedImagePoints),
-                      std::ref(current.reprojectedIndices));
+                      std::ref(current._3dToDescriptor),                        // pair of 3d reprojected world points & descriptors (it's not LUT)
+                      std::ref(current.reprojectedWorldPoints),                 // 3d reprojected world points
+                      std::ref(current.reprojectedImagePoints),                 // 2d reprojected image points
+                      std::ref(current.reprojectedIndices));                    // vector that contains reprojected points' indices
 
-        // calculate the camera pose again using successfully backprojected points
-        solverRefined = PnPSolver();
-        solverRefined.setPnPParam (PNPITERATION, PNPPIXELERROR, PNPCONFIDENCE);
+        cout << "  successfully reprojected " << current.reprojectedWorldPoints.size() << " points" << endl;
         
-        solverRefined.setWorldPoints(current.reprojectedWorldPoints);
-        solverRefined.setImagePoints(current.reprojectedImagePoints);
-        solverRefined.run(1);
+        // update LUT
+        _3dToDescriptorTable.insert(end(_3dToDescriptorTable), begin(current._3dToDescriptor), end(current._3dToDescriptor));
 
         // push frame into the window
-        if (trackedFrame.size() < WINDOWSIZE)
+        if (windowedFrame.size() < WINDOWSIZE)
         {
             // adding the current frame into the window
-            trackedFrame.push_back(current);
+            windowedFrame.push_back(current);
         }
         else
         {
+            // execute the bundle adjustment for both motion (R|t) and the structures (worldPoints)
+            // after the execution, all frames's motion and worldPoints within sliding window will be optimized
+            bundle.run(ref(windowedFrame));
+
             // clear the first index elements from lookup table
-            _3dToDescriptorTable.erase(_3dToDescriptorTable.begin(), _3dToDescriptorTable.begin() + trackedFrame[0].reprojectedWorldPoints.size());
+            _3dToDescriptorTable.erase(_3dToDescriptorTable.begin(), _3dToDescriptorTable.begin() + windowedFrame[0].reprojectedWorldPoints.size());
 
             // clear the first frame inside window if the window is full
-            trackedFrame.erase(trackedFrame.begin());
+            windowedFrame.erase(windowedFrame.begin());
+
+            // adding the current frame into the window
+            windowedFrame.push_back(current);
         }
 
         // now current becomes previous frame

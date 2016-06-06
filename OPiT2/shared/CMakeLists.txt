@@ -32,9 +32,8 @@ else()
                         ./source/Reprojection.cpp
                         ./source/VisualOdometry.cpp
                         ./source/Common.cpp
-                        ./source/BundleAdjust.cpp)
-
-                        #./source/Frame.cpp)
+                        ./source/BundleAdjust.cpp
+                        ./source/Frame.cpp)
                         #./source/Triangulation.cpp
                         #./source/Log.cpp
     add_library (shared ${LIB_SOURCES})

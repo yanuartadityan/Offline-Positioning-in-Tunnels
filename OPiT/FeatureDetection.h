@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <iostream>
 
+#include "Frame.h"
+
 // TODO: future mod on the class naming
 class FeatureDetection
 {
@@ -37,17 +39,12 @@ public:
 	// methods for matching descriptors
     void bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<cv::DMatch> > &matches);
 	void ratioTest (std::vector<std::vector<cv::DMatch> > &, std::vector<int> &, std::vector<int> &);
-
+    void ratioTestRansac (vector<vector<DMatch> > &, Frame &, Frame &, bool);
     // draw keypoints
     void drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output);
 
     // return some val
     float getSiftMatchingRatio ();
-
-    // method for compute features, matching with lookup table and RANSAC
-    void computeFeaturesAndMatching(cv::Mat img, std::vector<cv::Point2d> tunnel2D, std::vector<cv::Point3d> tunnel3D, cv::Mat tunnelDescriptor, int frameCounter,
-                                    std::vector<cv::KeyPoint> *detectedkpts, cv::Mat *descriptor,
-                                    std::vector<cv::Point2d> *retrieved2D, std::vector<cv::Point3d> *retrieved3D);
 
 private:
     // pointer to the feature point detector object

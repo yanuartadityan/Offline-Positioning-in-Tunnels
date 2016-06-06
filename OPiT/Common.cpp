@@ -202,7 +202,7 @@ void Common::calcBestPoint ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat desc
     Point3d _mp3dcoord;
     for (int i=start; i<end; i++)
     {
-        temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), std::ref(cloud), std::ref(kdtree));
+        temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), std::ref(cloud), std::ref(kdtree));
         _mp3dcoord.x = temp[0]; _mp3dcoord.y = temp[1]; _mp3dcoord.z = temp[2];
         if ((_mp3dcoord.x > 0.0f) && (_mp3dcoord.y > 0.0f) && (_mp3dcoord.z > 0.0f))
         {
