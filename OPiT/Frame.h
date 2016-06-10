@@ -24,9 +24,11 @@ public:
     vector<vector<DMatch> >     matches;                    // size M,      all matches from feature matching
 
     vector <Point3d>            matchedWorldPoints;         // size M',     all 3d points from lookup table matching
+    vector <Point3d>            c_matchedWorldPoints;       // size K,      all 3d points reprojected points (camera coordinate)
     vector <Point2d>            matchedImagePoints;         // size M',     all 2d points from the matching
 
-    vector <Point3d>            reprojectedWorldPoints;     // size K,      all 3d points reprojected from all keypoints
+    vector <Point3d>            reprojectedWorldPoints;     // size K,      all 3d points reprojected from all keypoints (world coordinate)
+    vector <Point3d>            c_reprojectedWorldPoints;   // size K,      all 3d points reprojected points (camera coordinate)
     vector <Point2d>            reprojectedImagePoints;     // size K,      all 2d points that successfully backprojected
     vector <int>                reprojectedIndices;         // size K,      indices for allcorresponding 3d/2d backprojected points
 
@@ -46,7 +48,8 @@ public:
     Frame();
     ~Frame();
 
-    void get
+    void                        projectWorldtoCamera();     // project world space 3d points into camera space
+    void                        projectCameratoWorld();     // project camera space 3d points into world
 
 private:
 };
