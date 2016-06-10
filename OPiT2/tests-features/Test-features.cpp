@@ -41,6 +41,9 @@ int main ()
     int startFrame = STARTFRAME;
     int endFrame   = ENDFRAME;
 
+    int count = 0;
+    int totaldetectedkptslow = 0;
+    int totaldetectedkptshigh = 0;
     char currImgPath[100];
     while (startFrame < endFrame)
     {
@@ -50,15 +53,21 @@ int main ()
         sprintf(currImgPath, "%simg_%05d.png", imgPath.c_str(), startFrame);
         Mat img = imread(currImgPath);
 
-        fdet.siftDetector(img, detectedkpts);
-        logFile << detectedkpts.size() << ", " << std::flush;
-
         Mat imgClone = img.clone();
         Mat mask = Mat::zeros(imgClone.size(), CV_8U);
         Mat roi (mask, Rect(0, 0, imgClone.cols, imgClone.rows*7/8));
         roi = Scalar(255, 255, 255);
+
+        fdet.siftDetector(img, detectedkpts);
+        logFile << detectedkpts.size() << ", " << std::flush;
+
         fdet.siftDetector(imgClone, detectedkpts, mask);
         logFile << detectedkpts.size() << ", " << std::flush;
+
+        if (count < 165)
+        {
+            totaldetectedkptslow += detectedkpts.size();
+        }
 
 
         fdet2.siftDetector(img, detectedkpts);
@@ -67,6 +76,18 @@ int main ()
         fdet2.siftDetector(imgClone, detectedkpts, mask);
         logFile << detectedkpts.size() << std::flush << endl;
 
+        if (count < 165)
+        {
+            totaldetectedkptshigh += detectedkpts.size();
+        }
+
+        if (count == 165)
+        {
+            cout << "avg low kpts for first " << count << "frames is " << (double)(totaldetectedkptslow/count) << endl;
+            cout << "avg hig kpts for first " << count << "frames is " << (double)(totaldetectedkptshigh/count) << endl;
+        }
+
+        count++;
         startFrame++;
     }
 
