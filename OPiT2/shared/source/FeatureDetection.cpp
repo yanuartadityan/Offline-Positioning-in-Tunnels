@@ -33,7 +33,7 @@ FeatureDetection::FeatureDetection()
 	// surf
 	min_hessian = 200;
 	octave_layer = 3;
-	contrast_threshold = 0.01;			// default 0.04, lower value more features
+	contrast_threshold = 0.004;			// default 0.04, lower value more features
 	edge_threshold = 10;				// default 10, higher value more features
 	sigma = 1.6;
 
@@ -42,9 +42,9 @@ FeatureDetection::FeatureDetection()
 
 	//detector
 	fastdetect_ = FastFeatureDetector::create(
-		10,			// int		threshold on difference between intensity of the central pixel and pixels of a circle around this pixel.
+		20,			// int		threshold on difference between intensity of the central pixel and pixels of a circle around this pixel.
 		true,		// bool		nonmaxSuppression. If true, non-maximum suppression is applied to detected corners (keypoints).
-		2			// int		type, one of the three neighborhoods as defined in the paper:	FastFeatureDetector::TYPE_9_16,
+        FastFeatureDetector::TYPE_9_16			// int		type, one of the three neighborhoods as defined in the paper:	FastFeatureDetector::TYPE_9_16,
 					//																			FastFeatureDetector::TYPE_7_12,
 					//																			FastFeatureDetector::TYPE_5_8
 		);
@@ -206,6 +206,12 @@ void FeatureDetection::fastDetector(cv::Mat img, std::vector<cv::KeyPoint> &dete
     fastdetect_->detect(img, detectedPoints);
 }
 
+void FeatureDetection::fastDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints, cv::Mat mask)
+{
+    // detect keypoints using fast
+    fastdetect_->detect(img, detectedPoints, mask);
+}
+
 void FeatureDetection::surfDetector(cv::Mat img, std::vector<cv::KeyPoint> &detectedPoints)
 {
     // detect keypoints using surf
@@ -239,7 +245,7 @@ void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> de
 void FeatureDetection::bfMatcher (cv::Mat queryDesc, cv::Mat trainDesc, std::vector<std::vector<DMatch> > &matches)
 {
 	// matching using BF L2
-	matcher_->knnMatch(queryDesc, trainDesc, matches, 2);
+	matcher_->knnMatch(queryDesc, trainDesc, matches, 200);
 }
 
 void FeatureDetection::ratioTest (vector<vector<DMatch> > &matches, vector<int> &retrieved3D, vector<int> &retrieved2D)
@@ -272,6 +278,8 @@ void FeatureDetection::ratioTestRansac (vector<vector<DMatch> > &matches, Frame 
 
     for (int i=0; i<matches.size(); i++)
     {
+        double tresholdDist = 0.25 * sqrt(double(curr.image.size().height*curr.image.size().height + curr.image.size().width*curr.image.size().width));
+
         // get the closest neighbour (index 0 always gives the closest descriptor)
         DMatch first = matches[i][0];
 
@@ -279,7 +287,11 @@ void FeatureDetection::ratioTestRansac (vector<vector<DMatch> > &matches, Frame 
         auto dist1 = matches[i][0].distance;
         auto dist2 = matches[i][1].distance;
 
-        if (dist1 < this->getSiftMatchingRatio() * dist2)
+        Point2d from = prev.keypoints[first.queryIdx].pt;
+        Point2d to   = curr.keypoints[first.trainIdx].pt;
+        double pixelDist = sqrt((from.x - to.x) * (from.x - to.x) + (from.y - to.y) * (from.y - to.y));
+
+        if (dist1 < this->getSiftMatchingRatio() * dist2 && pixelDist < tresholdDist)
         {
             goodMatches.push_back(first);
             prev2D.push_back(prev.reprojectedImagePoints[first.queryIdx]);
@@ -289,8 +301,9 @@ void FeatureDetection::ratioTestRansac (vector<vector<DMatch> > &matches, Frame 
 
     // RANSAC using find homogeneus
     vector<uchar> state;
-    findFundamentalMat(prev2D, curr2D, FM_RANSAC, 5, 0.99, state);
+    findFundamentalMat(prev2D, curr2D, FM_RANSAC, 3, 0.99, state);
 
+    Mat matchedDesc;
     for (size_t i = 0; i<state.size(); ++i)
     {
         // discards outliers (mask == 0)
@@ -299,17 +312,17 @@ void FeatureDetection::ratioTestRansac (vector<vector<DMatch> > &matches, Frame 
             goodMatches2.push_back(goodMatches[i]);
             prev2Drefined.push_back(goodMatches[i].queryIdx);
             curr2Drefined.push_back(goodMatches[i].trainIdx);
+            matchedDesc.push_back(curr.descriptors.row(goodMatches[i].trainIdx));
         }
     }
 
     if (verbose)
     {
-   cout << "    num of RAW matches (SIFT ratio)    : " << goodMatches.size() << endl;
-   cout << "    num of REF matches (RANSAC)        : " << goodMatches2.size() << endl;
-   cout << "    num of removed outliers            : " << goodMatches.size()-goodMatches2.size() << endl;
-   cout << "    outliers in percent (%)            : " << (double)(goodMatches.size()-goodMatches2.size())/(double)goodMatches.size()*100 << endl;
-   cout << "    inliers in percent (%)             : " << 100 - (double)(goodMatches.size()-goodMatches2.size())/(double)goodMatches.size()*100 << endl;
-   cout << endl;
+        cout << "    num of RAW matches (SIFT ratio)    : " << goodMatches.size() << endl;
+        cout << "    num of REF matches (RANSAC)        : " << goodMatches2.size() << endl;
+        cout << "    num of removed outliers            : " << goodMatches.size()-goodMatches2.size() << endl;
+        cout << "    outliers in percent (%)            : " << (double)(goodMatches.size()-goodMatches2.size())/(double)goodMatches.size()*100 << endl;
+        cout << "    inliers in percent (%)             : " << 100 - (double)(goodMatches.size()-goodMatches2.size())/(double)goodMatches.size()*100 << endl;
     }
 
     // get the world-image correspondences
@@ -319,6 +332,8 @@ void FeatureDetection::ratioTestRansac (vector<vector<DMatch> > &matches, Frame 
         curr.matchedWorldPoints.push_back(prev.reprojectedWorldPoints[prev2Drefined[i]]);
         // current image points are obtained from the keypoints
         curr.matchedImagePoints.push_back(curr.keypoints[curr2Drefined[i]].pt);
+        // current lookuptable
+        //curr._3dToDescriptor.push_back(make_pair(prev.reprojectedWorldPoints[prev2Drefined[i]], curr.descriptors.row(goodMatches2[i].trainIdx)));
     }
 }
 

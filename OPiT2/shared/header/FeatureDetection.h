@@ -28,6 +28,7 @@ public:
 
     // methods for feature detections, SIFT, FAST and SURF
     void fastDetector(cv::Mat img, std::vector<cv::KeyPoint>& detectedPoints);
+    void fastDetector(cv::Mat img, std::vector<cv::KeyPoint>& detectedPoints, cv::Mat mask);
     void siftDetector(cv::Mat img, std::vector<cv::KeyPoint>& detectedPoints);
 	void siftDetector(cv::Mat img, std::vector<cv::KeyPoint>& detectedPoints, cv::Mat mask);
     void surfDetector(cv::Mat img, std::vector<cv::KeyPoint>& detectedPoints);

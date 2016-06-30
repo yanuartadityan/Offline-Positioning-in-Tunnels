@@ -115,7 +115,7 @@ void BundleAdjust::prepareData(vector<Point3d> &points3D,
         points3D.insert(std::end(points3D), std::begin(trackedFrame[i].matchedWorldPoints), std::end(trackedFrame[i].matchedWorldPoints));
         cout << "    window-" << i << "-th with " << trackedFrame[i].matchedWorldPoints.size() << " 3D points" << endl;
     }
-    
+
     // check duplicates of 3D points to some very small threshold and erase the duplicate
     /*
     std::sort(points3D.begin(), points3D.end(), comparePoint3D);
@@ -129,14 +129,14 @@ void BundleAdjust::prepareData(vector<Point3d> &points3D,
     {
         visibility[i].resize(points3D.size());
         pointsImg[i].resize(points3D.size());
-        
+
         for (int j=0; j<points3D.size(); j++)
         {
             pointsImg[i][j].x = std::numeric_limits<float>::quiet_NaN();
             pointsImg[i][j].y = std::numeric_limits<float>::quiet_NaN();
         }
     }
-    
+
     // check visibility by checking each elements inside points3D and returns visibility mask and corresponding
     // 2d feature points (for each frame)
     int count = 0;
@@ -165,14 +165,14 @@ void BundleAdjust::prepareData(vector<Point3d> &points3D,
         }
     }
     cout << "  visible items: " << count << endl;
-    
+
     // append camera matrix, R, t and distCoeffs
     Mat rTemp;
     for (int i=0; i<trackedFrame.size(); i++)
     {
         // convert from 3x3 matrix to Rodrigues rotation matrix
         Rodrigues(trackedFrame[i].R, rTemp);
-    
+
         R.push_back(rTemp);
         T.push_back(trackedFrame[i].t);
         cameraMatrix.push_back(trackedFrame[i].K);
@@ -186,7 +186,7 @@ void BundleAdjust::updateData(vector<Point3d> points3D, vector<Mat> R, vector<Ma
     for (int i=0; i<updatedFrame.size(); i++)
     {
         // update each frame inside window
-        
+
         // update world points
         int begin, end;
         begin = worldPointsCount;
@@ -194,14 +194,12 @@ void BundleAdjust::updateData(vector<Point3d> points3D, vector<Mat> R, vector<Ma
         std::vector<Point3d>   temp3d(&points3D[begin],&points3D[end]);
         updatedFrame[i].matchedWorldPoints = temp3d;
 
-        updatedFrame[i].projectCameratoWorld();
-        
         // update rotation and translation matrices
         Mat R_33;
         Rodrigues(R[i], R_33);
         updatedFrame[i].R = R_33;
         updatedFrame[i].t = t[i];
-        
+
         // update camera pose (T)
         updatedFrame[i].cameraPose.at<double>(0,0) = R_33.at<double>(0,0);
         updatedFrame[i].cameraPose.at<double>(0,1) = R_33.at<double>(0,1);
@@ -231,11 +229,11 @@ void BundleAdjust::run(vector<Frame> &windowedFrame)
     vector<Mat>                     distCoeffs, R, T;
 
     this->trackedFrame = windowedFrame;
-        
+
     // prepare the data for the bundle
     prepareData(points3D, pointsImg, ref(visibility), ref(cameraMatrix), ref(R), ref(T), ref(distCoeffs));
 
-    
+
     // run the sparse bundle adjustment for N-window size
     double repError = sba.run(ref(points3D),
                                   pointsImg,
@@ -244,10 +242,10 @@ void BundleAdjust::run(vector<Frame> &windowedFrame)
                               ref(R),
                               ref(T),
                                   distCoeffs);
-    
-    
+
+
     // do something to the trackedFrame
     updateData(points3D, R, T, windowedFrame);
-    
+
     cout << "  reprojection error after bundle adjustment: " << repError << endl;
 }

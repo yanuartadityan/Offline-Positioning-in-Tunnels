@@ -19,29 +19,42 @@ Frame::~Frame()
     // destruct nothing
 }
 
-void Frame::projectWorldtoCamera()
+void Frame::updateCameraParameters  (cv::Mat camMatrix, cv::Mat camDistCoefficient, cv::Mat rVec, cv::Mat rRodrigues, cv::Mat tVec, cv::Mat camPose)
 {
-    this->c_matchedWorldPoints.clear();
-    for (int i=0; i<this->matchedWorldPoints.size(); i++)
-    {
-        Mat w_pointTemp = (Mat1d(3,1) << this->matchedWorldPoints[i].x,
-                                         this->matchedWorldPoints[i].y,
-                                         this->matchedWorldPoints[i].z);
-        Mat c_pointTemp = this->R * w_pointTemp + this->t;
-        this->c_matchedWorldPoints.push_back (Point3d(c_pointTemp));
-    }
+    this->K             = camMatrix;
+    this->distCoef      = camDistCoefficient;
+    this->R             = rVec;
+    this->R_rodrigues   = rRodrigues;
+    this->t             = tVec;
+    this->cameraPose    = camPose;
+
+    this->R_invert      = this->R.inv();
+    this->t_invert      = (-(this->R_invert) * this->t);
 }
 
-void Frame::projectCameratoWorld()
-{
-    this->matchedWorldPoints.clear();
-    for (int i=0; i<this->c_matchedWorldPoints.size(); i++)
-    {
-        Mat c_pointTemp = (Mat1d(3,1) << this->c_matchedWorldPoints[i].x,
-                                         this->c_matchedWorldPoints[i].y,
-                                         this->c_matchedWorldPoints[i].z);
-        Mat w_pointTemp = this->R.inv() * c_pointTemp + ((-(this->R.inv()) * this->t));
-        
-        this->matchedWorldPoints.push_back (Point3d(w_pointTemp));
-    }
-}
+// void Frame::projectWorldtoCamera()
+// {
+//     this->c_matchedWorldPoints.clear();
+//     for (int i=0; i<this->matchedWorldPoints.size(); i++)
+//     {
+//         Mat w_pointTemp = (Mat1d(3,1) << this->matchedWorldPoints[i].x,
+//                                          this->matchedWorldPoints[i].y,
+//                                          this->matchedWorldPoints[i].z);
+//         Mat c_pointTemp = this->R * w_pointTemp + this->t;
+//         this->c_matchedWorldPoints.push_back (Point3d(c_pointTemp));
+//     }
+// }
+//
+// void Frame::projectCameratoWorld()
+// {
+//     this->matchedWorldPoints.clear();
+//     for (int i=0; i<this->c_matchedWorldPoints.size(); i++)
+//     {
+//         Mat c_pointTemp = (Mat1d(3,1) << this->c_matchedWorldPoints[i].x,
+//                                          this->c_matchedWorldPoints[i].y,
+//                                          this->c_matchedWorldPoints[i].z);
+//         Mat w_pointTemp = this->R.inv() * c_pointTemp + ((-(this->R.inv()) * this->t));
+//
+//         this->matchedWorldPoints.push_back (Point3d(w_pointTemp));
+//     }
+// }

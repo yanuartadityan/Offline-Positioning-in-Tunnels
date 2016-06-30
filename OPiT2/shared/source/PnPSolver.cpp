@@ -101,14 +101,14 @@ int PnPSolver::run(int verbalOutput)
 		calib.getDistortionCoeffs(),// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients
 		rVec,						// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
 		tVec,						// Output translation vector
-		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
+		true,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 									//						of the rotation and translation vectors, respectively, and further optimizes them.
 		paramIterCount,				// ITERATIONS COUNT, number of iterations
 		paramRepError,				// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
 		paramConfidence,			// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
-		SOLVEPNP_ITERATIVE);				// FLAGS, method for solving a PnP problem.
+		SOLVEPNP_P3P);				// FLAGS, method for solving a PnP problem.
 
 		//Create the rotation matrix from the vector created above, by using the "Rodrigues"
 		rMat.create(3, 3, DataType<double>::type);

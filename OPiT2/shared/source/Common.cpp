@@ -185,6 +185,14 @@ Mat Common::getdescriptor (vector< pair<Point3d, Mat> > lookuptable)
     return descriptorTemp;
 }
 
+vector<Point3d> Common::getworldPoint (vector< pair<Point3d, Mat> > lookuptable)
+{
+    vector<Point3d> worldPointTemp;
+    for (pair<Point3d, Mat> pair : lookuptable)
+        worldPointTemp.push_back(pair.first);
+    
+    return worldPointTemp;
+}
 
 /* ---------------------------------------------------------------------------------------------------------
     multithreading support for backprojection

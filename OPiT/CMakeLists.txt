@@ -26,6 +26,8 @@ file (GLOB src_files
     "*.h")
 
 list (REMOVE_ITEM src_files ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp)
+list (REMOVE_ITEM src_files ${CMAKE_CURRENT_SOURCE_DIR}/MainWrapper.cpp)
+list (REMOVE_ITEM src_files ${CMAKE_CURRENT_SOURCE_DIR}/MainWrapper.h)
 
 #compile flag
 # add_definitions(-DKITTI_DATASET)
