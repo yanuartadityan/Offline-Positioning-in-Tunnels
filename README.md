@@ -13,8 +13,8 @@ We developed a solution by analysing an image sequence where feature detection a
 
 All the functions share same copyright as OpenCV has however some of the codes are limited only for educational purposes. For this usage, remain transparent and kindly let us know:
 
-* Bennehag, **David** (Sigma Technologies) [@david.bennehag[at]gmail.com]
-* Nugraha, **Yanuar** T. Aditya (Volvo Cars) [@yanuart.adityan[at]gmail.com]
+* [Bennehag, **David**](david.bennehag@gmail.com) - Sigma Technologies
+* [Nugraha, **Yanuar** T. Aditya](yanuart.adityan@gmail.com) - Volvo Cars
 
 ## Keywords
 
