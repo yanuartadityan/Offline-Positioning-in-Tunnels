@@ -3,402 +3,679 @@
 
 	Requires OpenCV (tested on 3.1) AND PCL
 */
+//#include <cvsba.h>
+//#include <sba.h>
 
-//
-// a main .cpp file for testing whole solution and bundle adjustment at once
-#include <iostream>
-#include <vector>
-#include <fstream>
-#include <chrono>
-#include <numeric>
-
+//OPENCV
+#include <opencv2/features2d.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/videoio.hpp>
 #include <opencv2/opencv.hpp>
 
+//PCL
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
-//  include all class files
-#include "Common.h"
-#include "Frame.h"
+//OUR STUFF
 #include "FeatureDetection.h"
 #include "PnPSolver.h"
 #include "Calibration.h"
-#include "BundleAdjust.h"
+#include "Frame.h"
+#include "Reprojection.h"
 
-//  all definitions of variables
-#define WINDOWSIZE              1                       // number of tracked frames every timestep
-#define NUMTHREADS              8                       // number of threads spawned for backprojections
-#define PNPITERATION            1000                    // number of iteration for pnp solver
-#define PNPPIXELERROR           5                       // toleration of error pin pixel square
-#define PNPCONFIDENCE           0.99                    // confidence level of 99%
-#define LENGTHFRAME             100                     // number of processed frames
-#define MINFRAMEIDX             433                     // default frame index
-#define MAXFRAMEIDX             MINFRAMEIDX-LENGTHFRAME // default frame index + length
-#define MINCORRESPONDENCES      10                       // minimum amount of 3D-to-2D correspondencs of PnP
 
-//  all namespaces
+//C++ STUFF
+#include <iostream>
+#include <string>
+#include <thread>
+#include <mutex>
+#include <chrono>
+#include <fstream>
+#include <cmath>
+
 using namespace std;
 using namespace cv;
-using namespace pcl;
 
-// path to the cloud, tunnel initial correspondences and image sequences
-const string cloudPath   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/gnistangtunneln-full-voxelized.pcd";
-const string map2Dto3D   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.txt";
-const string mapDesc     = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.yml";
-const string imgPath     = "/Users/januaditya/Thesis/exjobb-data/volvo/tunnel-frames/";
-//const string imgPath     = "/Users/januaditya/Desktop/thesis/gopro/frames/";
+const int NR_OF_FRAMES = 20;
+const int FIRST_INDEX = 433, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
+const int CLEARING_PERIODICITY = 10;
 
+const int NUMBEROFTHREADS = 16;
+const bool PAR_MODE = true;
+static const bool DRAWKPTS = true;
+
+std::mutex global_mutex;
+
+
+
+
+/*
+*	Update the Look Up Table for what descriptor belongs to which image point
+*
+*	_3dToDescriptorMap.first[0]  == 3D coordinates vector
+*
+*	_3dToDescriptorVector[i].first.x == X
+*	_3dToDescriptorVector[i].first.y == Y
+*	_3dToDescriptorVector[i].first.z == Z
+*
+*	_3dToDescriptorVector[i].second == its descriptor
+
+		// Output: The Look Up Table containing all our descriptors and 3D-points
+		// Output: vector containing the keypoints for which we found 3D-points
+		// Output: vector containing the corresponding 3D-points
+		// Output: vector saving the indexes for which we got results
+		// Input:  the transformation matrix (camera pose)
+		// Input:  the camera matrix
+		// Input:  All the keypoints that SIFT found, these are the pixels we want to backproject
+		// Input:  The descriptors for those keypoints that should go into our LUT
+		// Input:  The point cloud used for the backprojection
+		// Input:  The kdtree that PCL uses for finding the closest neighbour
+		// Input:  Each thread gets a number of backprojections to do,
+		// Input:		from index "start" to "end"
+
+*/
+void calcBestPoint(
+	vector< pair<Point3d, Mat> >& _3dToDescriptorVector,
+	vector<Point2d>& projectedKeypoints,
+	vector<Point3d>& projectedWorldpoints,
+	vector<int>& projectedIndex,
+	Mat T,
+	Mat K,
+	vector<KeyPoint> keypoints1,
+	Mat descriptors1,
+	pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+	pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
+	int start,
+	int end)
+{
+	for (int i = start; i < end; i++)
+	{
+		Point2d queryPoint = Point2d(keypoints1[i].pt.x, keypoints1[i].pt.y);
+
+		vector<double> bestPoint = Reprojection::backproject(T, K, queryPoint, std::ref(cloud), std::ref(kdtree));
+
+		if (bestPoint[0] == 0 && bestPoint[1] == 0 && bestPoint[2] == 0)
+			continue;
+
+		// Define the 3D coordinate
+		Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
+
+		// Define its descriptor, should have size 1x128
+		Mat desc;
+
+
+		desc = descriptors1.row(i);
+
+		// Vectors are not thread safe, make sure only one thread at a time access it.
+		global_mutex.lock();
+
+		//cout << "thread " << this_thread::get_id() << " found point " << endl;
+		//	<< "X = \t" << bestPoint[0] << endl
+		//	<< "Y = \t" << bestPoint[1] << endl
+		//	<< "Z = \t" << bestPoint[2] << endl
+		//	<< "DIST = \t" << bestPoint[3] << endl;
+		// Push the pair into the lookup table
+		_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
+
+		projectedWorldpoints.push_back(_3dcoord);
+		projectedIndex.push_back(i);
+		projectedKeypoints.push_back(queryPoint);
+
+
+		global_mutex.unlock();
+	}
+}
+
+void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile, vector<Point2d>& tunnel2D, vector<Point3d>& tunnel3D, Mat& tunnelDescriptor);
+//vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree);
 string type2str(int type);
 
-//  start the main
-int main (int argc, char* argv[])
+int main(int argc, char** argv)
 {
-    // declare all the class objects
-    Common com;
-    FeatureDetection fdet;
-    PnPSolver solver;
-    Calibration cal;
-    BundleAdjust bundle;
+	/*
+		We want to log all of the calculated positions.
+			This should be in a format that can be imported straight into Matlab.
+	*/
+	ofstream logFile;
+	logFile.open("logs/cameraPositions.txt", std::ios::app);
+	logFile << endl << endl << "Camera Positions:" << endl << endl << "[ " << flush;
 
-    // declare all variables for global lookup table
-    vector<pair<Point3d, Mat> >     _3dToDescriptorTable;
-
-    // declare all variables for local frame information
-    vector<Point3d>                 _tunnel3D;
-    vector<Point2d>                 _tunnel2D;
-    Mat                             _tunnelDescriptor;
 
-    // set class objects initial parameters
-    solver.setPnPParam (PNPITERATION, PNPPIXELERROR, PNPCONFIDENCE);
+	vector<double> reprojectionErrors;
 
-    // point cloud variables
-    int startFrame, endFrame;                                   // marks index for frame start/end
-    PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);  // pointer to the cloud
-    pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-
-    // log
-    ofstream logFile, logMatrix, correspondences, correspondencesRefined;
-    char poseFileIdx[100]; char poseRefinedFileIdx[100];
-    {
-        com.createDir("log");
-
-        //open files for logging
-        logFile.open("./log/logPoses.txt", std::ios::out);
-        logMatrix.open("./log/logMatrix.txt", std::ios::out);
-    }
-
-    // handle the input arguments
-    if (argc !=3)
-    {
-        cout << "running the simulation for " << LENGTHFRAME << " frames" << endl;
-        cerr << "wrong number of input arguments..." << endl;
-        cerr << "using default parameter instead..." << endl;
-
-        startFrame = MINFRAMEIDX;
-        endFrame   = MAXFRAMEIDX;
-     }
-    else
-    {
-        startFrame = atoi(argv[1]);
-        endFrame   = atoi(argv[2]);
-        cout << "running the simulation for " << endFrame - startFrame << " frames" << endl;
-    }
-
-    // load the point cloud, create kd-tree, and report the cloud dimension
-    io::loadPCDFile(cloudPath, *cloud);
-    kdtree.setInputCloud(cloud);
-    cout << "loaded cloud with " << cloud->width * cloud->height << " points ("
-         << getFieldsList (*cloud) << ")" << endl;
-
-    // prepare the 2D, 3D and descriptor correspondences from files and initialise the lookuptable
-    com.prepareMap(map2Dto3D, mapDesc, ref(_tunnel2D), ref(_tunnel3D), ref(_tunnelDescriptor));
-    com.updatelut(_tunnel3D, _tunnelDescriptor, ref(_3dToDescriptorTable));
-
-    // init all objects and vars for the main sequences, in order of definition
-    int frameIndex = startFrame;
-    int frameCount = 0;
-    char currImgPath[100];
-    vector<Frame> windowedFrame;
-
-    Frame current;
-    Frame prev;
-
-
-
-
-    // start the positioning sequences
-    while (frameIndex > endFrame)
-    {
-        cout << "processing frame-" << frameCount << "..." << endl;
-
-
-        // log
-        {
-            sprintf(poseFileIdx, "./log/%d-poseFile.txt", frameIndex);
-            sprintf(poseRefinedFileIdx, "./log/%d-poseRefined.txt", frameIndex);
-
-            correspondences.open(poseFileIdx, std::ios::out);
-            correspondencesRefined.open(poseRefinedFileIdx, std::ios::out);
-        }
-
-
-        // create local object of frame and automatically cleared every new iteration
-        vector<int> matchesIndex3D;
-        vector<int> matchesIndex2D;
-
-        // load the image into the current frame
-        sprintf(currImgPath, "%simg_%05d.png", imgPath.c_str(), frameIndex);
-        //sprintf(currImgPath, "%s%04d.png", imgPath.c_str(), frameIndex);
-
-
-        // init current Frame
-        current = Frame();
-        current.frameIdx = frameCount;
-        current.image    = imread(currImgPath);
-
-
-
-        // preprocess the image to remove visible outliers, e.g. dashboard
-        Mat mask = Mat::zeros(current.image.size(), CV_8U);
-        Mat roi (mask, Rect(0, 0, current.image.cols, current.image.rows*7/8));
-        roi = Scalar(255, 255, 255);
-
-
-
-        // detect features from current frame with provided region of interest mask
-        fdet.siftDetector(current.image, current.keypoints, mask);
-
-        // extract feature descriptors from current frame
-        fdet.siftExtraction(current.image, current.keypoints, current.descriptors);
-
-
-
-        Mat lutDesc;
-        // match the current frame descriptor with every frames in the window
-        if (windowedFrame.size() != 0)
-        {
-            for (int i=windowedFrame.size()-1; i>=0; i--)
-            {
-                // if not empty, then correspondences has to be checked for every frames in the window
-                lutDesc = com.getdescriptor(windowedFrame[i]._3dToDescriptor);
-
-                // match descriptor
-                fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
-
-                // perform lowe's ratio test, last parameter is for cout verbose (true/false)
-                fdet.ratioTestRansac(current.matches, ref(windowedFrame[i]), ref(current), false);
-            }
-        }
-        // if window empty
-        else
-        {
-            // if empty, the correspondences are obtained from the lookuptable
-            lutDesc = com.getdescriptor(_3dToDescriptorTable);
-
-            // clean LUT
-            _3dToDescriptorTable.clear();
-
-            // matcher
-            fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
-
-            // perform David Lowe's ratio test. it gives 3D/2D indices to use in the next step
-            fdet.ratioTest(current.matches, ref(matchesIndex3D), ref(matchesIndex2D));
-
-            // retrieve the 3D from the lookup table, 2D from current frame's keypoints
-            if (matchesIndex2D.size() != matchesIndex3D.size())
-                cerr << "wrong size of 2D/3D correspondences" << endl;
-            else
-            {
-                for (int i=0; i<matchesIndex2D.size(); i++)
-                {
-                    current.matchedWorldPoints.push_back(Point3d(_3dToDescriptorTable[matchesIndex3D[i]].first.x,
-                                                                 _3dToDescriptorTable[matchesIndex3D[i]].first.y,
-                                                                 _3dToDescriptorTable[matchesIndex3D[i]].first.z));
-                    current.matchedImagePoints.push_back(Point2d(current.keypoints[matchesIndex2D[i]].pt.x,
-                                                                 current.keypoints[matchesIndex2D[i]].pt.y));
-                }
-            }
-        }
-
-
-
-        // once we got the 3D and 2D correspondences and bigger than min correspondences, compute the camera pose
-        if (current.matchedWorldPoints.size() < MINCORRESPONDENCES)
-        {
-            cerr << "not enough correspondences for PnP" << endl;
-            exit(EXIT_FAILURE);
-        }
-        else
-        {
-            cout << "  found " << current.matchedWorldPoints.size() << " 3D points from lookup table window" << endl;
-
-            // reinit solver
-            solver = PnPSolver();
-            solver.setPnPParam (PNPITERATION, PNPPIXELERROR, PNPCONFIDENCE);
-
-            solver.setImagePoints(current.matchedImagePoints);
-            solver.setWorldPoints(current.matchedWorldPoints);
-            cout << "  result after matching...";
-            solver.run(1);
-        }
-
-
-
-
-        // find the rest image points 3D representation using backprojections
-        // prepare the matrices
-        {
-            current.K           = cal.getCameraMatrix();
-            current.distCoef    = cal.getDistortionCoeffs();
-            current.R           = solver.getRotationMatrix();
-            current.R_rodrigues = solver.getRotationVector();
-            current.t           = solver.getTranslationVector();
-
-            // get the camera pose matrix (3x4). it consists of camera position and the transposed rotation matrix
-            current.cameraPose  = solver.getCameraPose();
-
-            // get the transposed/inversed rotation matrix (3x3).
-            // we can copy 3x3 upper left from the cameraPose (3x4) or just take the inverse of rotation matrix
-            current.R_invert    = current.R.inv();
-            current.t_invert    = (-(current.R_invert) * current.t);
-
-            // for the bundle adjustment, we need every 3d points to be in camera coordinates
-            current.projectWorldtoCamera();
-
-            // get the camera position (3x1) as t_invert.
-            // the alternative way is to copy 3x1 rightmost column from the cameraPose (3x4)
-            if (frameCount == 0)        // initial frame/camera at index-0
-            {
-                current.t_translation   = current.t_invert;
-            }
-            else                        // rest of the frames
-            {
-                current.t_translation   = current.t_invert - prev.t_invert;
-            }
-
-            // log for matched points
-            {
-                // save the current frame retrieved pair 2D and 3D
-                for (int i=0; i<current.matchedImagePoints.size(); i++)
-                {
-                    correspondences << std::fixed << setprecision(4)
-                    << current.matchedWorldPoints[i].x << ", "
-                    << current.matchedWorldPoints[i].y << ", "
-                    << current.matchedWorldPoints[i].z << ", " << std::flush;
-
-                    correspondences << std::fixed << setprecision(4)
-                    << current.matchedImagePoints[i].x << ", "
-                    << current.matchedImagePoints[i].y << "\n" << std::flush;
-                }
-
-                // save the initial camera position
-                logFile << std::fixed << setprecision(10)
-                        << current.cameraPose.at<double>(0,3) << ", "
-                        << current.cameraPose.at<double>(1,3) << ", "
-                        << current.cameraPose.at<double>(2,3) << "\n" << std::flush;
-
-                // save the initial Rotation and Translation matrices from PnP solver
-                logMatrix << std::fixed << setprecision(10)
-                          << current.R.at<double>(0,0) << ", " << current.R.at<double>(0,1) << ", " << current.R.at<double>(0,2) << ", "
-                          << current.R.at<double>(1,0) << ", " << current.R.at<double>(1,1) << ", " << current.R.at<double>(1,2) << ", "
-                          << current.R.at<double>(2,0) << ", " << current.R.at<double>(2,1) << ", " << current.R.at<double>(2,2) << ", "
-                          << current.t.at<double>(0)   << ", " << current.t.at<double>(1)   << ", " << current.t.at<double>(2)   << "\n" << std::flush;
-            }
-        }
-
-
-
-
-
-        // call the multithreaded backprojection wrapper
-        com.threading(NUMTHREADS,
-                      current.cameraPose,
-                      current.K,
-                      current.keypoints,
-                      current.descriptors,
-                      std::ref(cloud),
-                      std::ref(kdtree),
-                      std::ref(current._3dToDescriptor),                        // pair of 3d reprojected world points & descriptors (it's not LUT)
-                      std::ref(current.reprojectedWorldPoints),                 // 3d reprojected world points
-                      std::ref(current.reprojectedImagePoints),                 // 2d reprojected image points
-                      std::ref(current.reprojectedIndices));                    // vector that contains reprojected points' indices
-
-        cout << "  successfully reprojected " << current.reprojectedWorldPoints.size() << " points" << endl;
-
-
-
-        // log for reprojected 3D points
-        {
-            for (int i=0; i<current.reprojectedWorldPoints.size(); i++)
-            {
-                correspondencesRefined << std::fixed << setprecision(4)
-                                       << current.reprojectedWorldPoints[i].x << ", "
-                                       << current.reprojectedWorldPoints[i].y << ", "
-                                       << current.reprojectedWorldPoints[i].z << ", " << std::flush;
-
-                correspondencesRefined << std::fixed << setprecision(4)
-                                       << current.reprojectedImagePoints[i].x << ", "
-                                       << current.reprojectedImagePoints[i].y << "\n" << std::flush;
-            }
-        }
-
-
-
-
-        // update LUT
-        _3dToDescriptorTable.insert(end(_3dToDescriptorTable), begin(current._3dToDescriptor), end(current._3dToDescriptor));
-
-        // push frame into the window
-        windowedFrame.push_back(current);
-
-        // execute the bundle adjustment for both motion (R|t) and the structures (worldPoints)
-        // after the execution, all frames's motion and worldPoints within sliding window will be optimized
-        //bundle.run(ref(windowedFrame));
-
-
-
-        if (windowedFrame.size() > WINDOWSIZE)
-        {
-            // clear the first index elements from lookup table
-            _3dToDescriptorTable.erase(_3dToDescriptorTable.begin(), _3dToDescriptorTable.begin() + windowedFrame[0].reprojectedWorldPoints.size());
-
-            // clear the first frame inside window if the window is full
-            windowedFrame.erase(windowedFrame.begin());
-        }
-
-
-
-        // now current becomes previous frame
-        // TODO: still don't know how to use previous frame, verification maybe?
-        prev = Frame();
-        prev = current;
-
-
-
-        // end of sequences, go to the next frameIndex
-        frameIndex=frameIndex-2;
-        frameCount++;
-
-        // log
-        {
-           correspondences.close();
-           correspondencesRefined.close();
-        }
-    }
-
-
-
-
-    // log
-    {
-        logFile.close();
-        logMatrix.close();
-    }
-
-    // end of the main caller
-    return 0;
+	auto beginningOfMain = std::chrono::high_resolution_clock::now(),
+		 begin = std::chrono::high_resolution_clock::now();
+
+
+	// We load the point cloud once and then keep it open for the rest of the execution,
+	//    since the loading takes alot of time.
+	cout << endl << "Loading point cloud... ";
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::io::loadPCDFile("/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/gnistangtunneln-semifull-voxelized.pcd", *cloud);
+
+	cout << " And the kdtree... ";
+	//Build the kdtree for searching in the point cloud.
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+	kdtree.setInputCloud(cloud);
+
+	auto end = std::chrono::high_resolution_clock::now();
+	cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms)" << endl << endl;
+
+	/*
+		This is our Look Up Table, consisting of 3D points and their descriptors.
+	*/
+	vector< pair<Point3d, Mat> > _3dToDescriptorVector;
+
+
+	Calibration calib;
+	PnPSolver solver1(1000, 5, 0.99);
+	FeatureDetection fdetect;
+
+
+	char map2Dto3D[100];
+	char mapDescrip[100];
+	char nextimage[100];
+	vector<Point2d> tunnel2D;
+	vector<Point3d> tunnel3D;
+	Mat tunnelDescriptor;
+	sprintf(map2Dto3D, "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/ManualCorrespondences.txt");
+	sprintf(mapDescrip, "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/ManualCorrespondences.yml");
+
+	// Prepare the manual correspondences for the lookup table
+	prepareMap(map2Dto3D, mapDescrip, std::ref(tunnel2D), std::ref(tunnel3D), std::ref(tunnelDescriptor));
+
+	// Then push these manual correspondences into our lookup table.
+	for (int h = 0; h < tunnel3D.size(); h++)
+	{
+		_3dToDescriptorVector.push_back(make_pair(tunnel3D[h], tunnelDescriptor.row(h)));
+	}
+
+
+	Frame currentFrame, previousFrame;
+
+
+	int clearingCounter = 0;
+	int windowSize = 0;
+	// Start the iterating on the image we handled manually.
+	for (int i = FIRST_INDEX; i < LAST_INDEX; i++)
+	{
+		cout << "Iteration #" << clearingCounter << endl;
+
+		begin = std::chrono::high_resolution_clock::now();
+		sprintf(nextimage, "imageSequence\\img_%05d.png", i);
+		cout << "Loading image: " << nextimage << "... ";
+		//Mat frame1 = imread(nextimage);
+
+		currentFrame = Frame();
+		currentFrame.image = imread(nextimage);
+
+
+
+		// set the RoI (Region of Interest)
+		// this mask is to take only 80% of the upper part of the image
+		Mat img_maskUpperPart = Mat::zeros(currentFrame.image.size(), CV_8U);
+		Mat img_roiUpperPart(img_maskUpperPart, Rect(0, 0, currentFrame.image.cols, currentFrame.image.rows * 4 / 5));
+		img_roiUpperPart = Scalar(255, 255, 255);
+
+		cout << "Done!" << endl;
+
+		/*
+			Perform the Feature Detection and Extraction, together with the RoI implementation.
+		*/
+		begin = std::chrono::high_resolution_clock::now();
+		cout << "Running SIFT... ";
+		fdetect.siftDetector(currentFrame.image, currentFrame.keypoints, img_maskUpperPart);
+		fdetect.siftExtraction(currentFrame.image, currentFrame.keypoints, currentFrame.descriptors);
+		end = std::chrono::high_resolution_clock::now();
+		cout << "Done!\tFound " << currentFrame.descriptors.rows << " descriptors (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl;
+
+
+		// Take the descriptor Mat out of our lookup table for the matching in the next step.
+		Mat tunnelDescriptors;
+		for (pair<Point3d, Mat> pair : _3dToDescriptorVector)
+			tunnelDescriptors.push_back(pair.second);
+
+		if (i == 433)
+		{
+			solver1.run(0);
+		}
+		else
+		{
+			/*
+				Do the matching
+			*/
+			begin = std::chrono::high_resolution_clock::now();
+			cout << "Performing matching... ";
+
+			fdetect.bfMatcher(tunnelDescriptors, currentFrame.descriptors, currentFrame.matches);
+			cout << "tunnelDesc matches: " << tunnelDescriptor.size() << endl << " currFrame matches: " << currentFrame.matches.size() <<endl;
+			/*
+				 Retrieve the matched indices for the matched descriptors so we know which ones to use in the next step.
+			*/
+			vector<int> matchedIndices;
+			vector<int> matchedXYZ;
+			float dist1 = 0.0f, dist2 = 0.0f;
+
+			for (int j = 0; j < currentFrame.matches.size(); j++)
+			{
+				//
+				double distanceThreshold = 0.25 * sqrt(
+					double(currentFrame.image.size().height * currentFrame.image.size().height +
+						   currentFrame.image.size().width  * currentFrame.image.size().width));
+
+				DMatch first = currentFrame.matches[j][0];
+
+				dist1 = currentFrame.matches[j][0].distance;
+				dist2 = currentFrame.matches[j][1].distance;
+
+				Point2d previousFramePoint = previousFrame.keypoints[first.queryIdx].pt;
+				Point2d currentFramePoint = currentFrame.keypoints[first.trainIdx].pt;
+				double distance = sqrt(
+					(previousFramePoint.x - currentFramePoint.x) * (previousFramePoint.x - currentFramePoint.x) +
+					(previousFramePoint.y - currentFramePoint.y) * (previousFramePoint.y - currentFramePoint.y));
+
+				if ((dist1 < fdetect.getSiftMatchingRatio() * dist2) && distance < distanceThreshold)
+				{
+					matchedIndices.push_back(first.trainIdx);
+					matchedXYZ.push_back(first.queryIdx);
+				}
+			}
+			end = std::chrono::high_resolution_clock::now();
+			cout << "Done!\tMatched " << currentFrame.matches.size() << "/" << currentFrame.descriptors.rows << " descriptors (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl;
+
+
+
+
+			/*
+			*	We collect the 2D points from our keypoints and 3D points from our LUT.
+			*		These are then given to our PnP solver.
+			*/
+			vector<Point2d> retrieved2D;
+			vector<Point3d> retrieved3D;
+			for (int k = 0; k < matchedIndices.size(); k++)
+			{
+				retrieved2D.push_back(Point2d(currentFrame.keypoints[matchedIndices[k]].pt.x, currentFrame.keypoints[matchedIndices[k]].pt.y));
+
+				retrieved3D.push_back(Point3d(_3dToDescriptorVector[matchedXYZ[k]].first.x, _3dToDescriptorVector[matchedXYZ[k]].first.y, _3dToDescriptorVector[matchedXYZ[k]].first.z));
+			}
+
+			/*
+				We give the points we found to our PnP solver and then run the calculations
+					for finding the camera pose.
+						After run() is finished, it is all set up.
+			*/
+			cout << "Running solver... ";
+			solver1.setImagePoints(retrieved2D);
+			solver1.setWorldPoints(retrieved3D);
+			solver1.run(0);
+			cout << "Done!" << endl << endl;
+
+
+		}
+		cout << "Camera Position:" << endl << solver1.getCameraPosition() << endl;
+		currentFrame.cameraPose = solver1.getCameraPose().clone();
+		currentFrame.K = calib.getCameraMatrix();
+
+
+
+		// Keep track of all our threads
+		vector<thread> workers;
+
+		begin = std::chrono::high_resolution_clock::now();
+		cout << "Performing backprojection of " << currentFrame.descriptors.rows << " descriptors... ";
+		/*
+		 *	After finding our projection matrix, we can backproject the descriptors we found
+		 *		onto the point cloud.
+		 */
+		vector<Point2d> projectedKeypoints;
+		vector<Point3d> projectedWorldpoints;
+		vector<int>		projectedIndex;
+		if(PAR_MODE)		//RUN THE BACKPROJECTION WITH THREADS IN PARALLELL
+		{
+			cout << "Running multithreaded..." << endl;
+
+			int keypointsPerThread = currentFrame.keypoints.size() / NUMBEROFTHREADS;
+
+			for (int threadIndex = 0; threadIndex < NUMBEROFTHREADS; threadIndex++)
+			{
+				int start = threadIndex * keypointsPerThread;
+				int end = (threadIndex + 1) * keypointsPerThread;
+
+				// We create one worker for each keypoint.
+				// The order in which they push their results into the look up table does not matter.
+				workers.push_back(
+						thread( calcBestPoint,
+								std::ref(_3dToDescriptorVector),
+								std::ref(projectedKeypoints),
+								std::ref(projectedWorldpoints),
+								std::ref(projectedIndex),
+								currentFrame.cameraPose,
+								currentFrame.K,
+								currentFrame.keypoints,
+								currentFrame.descriptors,
+								std::ref(cloud),
+								std::ref(kdtree),
+								start,
+								end));
+			}
+
+			// Join acts as a "wall", so that all threads finish before the main thread continues.
+			for (int l = 0; l < workers.size(); l++)
+			{
+				//cout << "Joining thread #" << workers[l].get_id() << endl;
+				if (workers[l].joinable())
+					workers[l].join();
+			}
+			workers.clear();
+		}
+
+
+		else		// RUN IN SEQUENTIAL MODE INSTEAD
+		{
+			cout << "Running singlethreaded..." << endl;
+			for (int counter = 0; counter < currentFrame.keypoints.size(); counter = counter + 20)
+			{
+				vector<double> bestPoint = Reprojection::backproject(
+					currentFrame.cameraPose,
+					currentFrame.K,
+					Point2d(currentFrame.keypoints[counter].pt.x, currentFrame.keypoints[counter].pt.y),
+					cloud,
+					kdtree);
+
+				if (bestPoint[0] == 0 || bestPoint[1] == 0 || bestPoint[2] == 0)
+				{
+					cout << "Threw away empty projection result!" << endl;
+					continue;
+				}
+
+				/*
+				*	Update the Look Up Table for what descriptor belongs to which image point
+				*
+				*	_3dToDescriptorMap.first[0]  == 3D coordinates vector
+				*
+				*	_3dToDescriptorVector[i].first.x == X
+				*	_3dToDescriptorVector[i].first.y == Y
+				*	_3dToDescriptorVector[i].first.z == Z
+				*
+				*	_3dToDescriptorVector[i].second == its descriptor
+				*/
+				// Define the 3D coordinate
+				Point3d _3dcoord; _3dcoord.x = bestPoint[0]; _3dcoord.y = bestPoint[1]; _3dcoord.z = bestPoint[2];
+
+				// Define its descriptor, should have size 1x128
+				Mat desc;
+				if (counter > currentFrame.descriptors.rows)
+					continue;
+				desc = currentFrame.descriptors.row(counter);
+
+				// Push the pair into the lookup table
+				_3dToDescriptorVector.push_back(make_pair(_3dcoord, desc));
+				//tunnel3D.push_back(_3dcoord);
+				//tunnelDescriptor.push_back(descriptors1.row(counter));
+			}
+		}
+		//END OF BACKPROJECTION
+		previousFrame = Frame();
+		previousFrame = currentFrame;
+
+		end = std::chrono::high_resolution_clock::now();
+		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl << endl;
+
+		cout << "Size of our LUT: " << endl << _3dToDescriptorVector.size() << endl;
+
+
+
+
+
+
+
+
+		/*
+		DEBUGGING STUFF
+		*/
+
+
+		cout << "Camera Position:" << endl << solver1.getCameraPosition() << endl;
+
+
+		if(++clearingCounter >= CLEARING_PERIODICITY)
+		{
+			windowSize += projectedIndex.size();
+			/*
+			*	To prevent the LUT from growing too big and possibly match against too old entries,
+			*		we periodically clear everything but the last frame's backprojection results.
+			*/
+			if (clearingCounter % CLEARING_PERIODICITY == 0 && clearingCounter != CLEARING_PERIODICITY)
+			{
+				//clearingCounter = 0;
+
+				vector< pair<Point3d, Mat> > tempLUT;
+				int diff = std::abs((int) (windowSize - _3dToDescriptorVector.size()));
+
+				std::vector< pair<Point3d, Mat> >::iterator halfway = _3dToDescriptorVector.begin() + diff;
+				std::vector< pair<Point3d, Mat> >::iterator endItr = _3dToDescriptorVector.end();
+
+				cout << "Clearing the LUT... Last number of successful backprojections was " << projectedIndex.size() << endl;
+
+				tempLUT.insert(tempLUT.begin(), halfway, endItr);
+
+				_3dToDescriptorVector.clear();
+
+				_3dToDescriptorVector.insert(_3dToDescriptorVector.begin(), tempLUT.begin(), tempLUT.end());
+
+				tempLUT.erase(tempLUT.begin());
+
+				cout << "New size of LUT: " << _3dToDescriptorVector.size() << endl;
+
+			}
+
+		}
+
+
+
+		// 15. check reprojection error of each backprojected world points
+		vector<Point2d> reprojectedPixels;
+		projectPoints(projectedWorldpoints,
+			solver1.getRotationMatrix(),
+			solver1.getTranslationVector(),
+			calib.getCameraMatrix(),
+			calib.getDistortionCoeffs(),
+			reprojectedPixels);
+
+		double repError = 0;
+		for (int itx = 0; itx < projectedIndex.size(); itx++)
+		{
+			double dx, dy;
+
+			dx = pow(abs(reprojectedPixels[itx].x - currentFrame.keypoints[projectedIndex[itx]].pt.x), 2);
+			dy = pow(abs(reprojectedPixels[itx].y - currentFrame.keypoints[projectedIndex[itx]].pt.y), 2);
+
+			repError += sqrt(dx + dy);
+			reprojectionErrors.push_back(repError);
+		}
+		cout << setprecision(15) << "Reprojection error: " << repError / projectedWorldpoints.size() << " pixels"
+			 << "\t(" << repError << "/" << projectedWorldpoints.size() << ")" << endl;
+		//double sum = 0;
+		//for (double err : reprojectionErrors)
+		//	sum += err;
+		//cout << "Average so far is: " << sum / reprojectionErrors.size() << endl;
+
+
+
+		/*	CVSBA stuff, code ready but library not setup
+
+		auto begin = std::chrono::high_resolution_clock::now();
+		cout << "Performing Bundle Adjustment... ";
+		vector<Point3d> points;
+		for (pair<Point3d, Mat> pair : _3dToDescriptorVector)
+			points.push_back(pair.first);
+		const vector<vector <Point2d> > imagePoints = { solver1.getImagePoints() };
+		const vector<vector<int> > visibility = { vector<int>(imagePoints.size(), 1) };
+		vector<Mat> cameraMatrices = { calib.getCameraMatrix() };
+		vector<Mat> rotationMatrices = { solver1.getRotationMatrix() };
+		vector<Mat> translationMatrices = { solver1.getTranslationVector() };
+		vector<Mat> distCoeffMatrices = { calib.getDistortionCoeffs() };
+
+		cvsba::Sba sba;
+		sba.run(		points,
+						imagePoints,
+						visibility,
+						cameraMatrices,
+						rotationMatrices,
+						translationMatrices,
+						distCoeffMatrices);
+
+		cout << " Done!" << endl;
+		auto end = std::chrono::high_resolution_clock::now();
+		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms)" << endl << endl;
+		*/
+
+		/*
+		*		Let's print all the calculated camera positions to a log file!
+		*/
+		Mat pos = solver1.getCameraPosition();
+		logFile << setprecision(10)
+			<< pos.at<double>(0, 0) << " "
+			<< pos.at<double>(1, 0) << " "
+			<< pos.at<double>(2, 0);
+		if (i != LAST_INDEX - 1)
+			logFile << "; ..." << endl;
+		else
+			logFile << "];" << endl;
+		logFile << flush;
+
+		cout << endl << "****************** STARTING OVER ******************" << endl << endl << endl;
+	}
+
+	auto endOfMain = std::chrono::high_resolution_clock::now();
+	cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(endOfMain - beginningOfMain).count() << " ms)" << endl << endl;
+
+
+	double sum = 0;
+	for (double err : reprojectionErrors)
+		sum += err;
+	cout << "Average reprojection error: " << sum / reprojectionErrors.size() << endl;
+
+
+
+
+	logFile.close();
+
+	return 0;
 }
+
+
+
+
+
+
+
+
+/*
+
+vector< pair<Point3d, Mat> > manualStuff(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
+{
+	Mat frame1;
+	Mat descriptors1, descriptors2;
+	vector<KeyPoint> keypoints1, keypoints2;
+	vector< pair<Point3d, Mat> > _3dToDescriptorVector;
+
+
+	Calibration calib;
+	PnPSolver solver1, solver2;
+
+	FeatureHandler fdetect;
+
+	Mat distCoeffs = calib.getDistortionCoeffs();
+
+	// MANUAL CORRESPONDENCES PNP SOLVER
+	//cout << "Running first solver... ";
+
+	vector<Point2d> imageOne;
+	imageOne.push_back(Point2d(397.210571, 145.146866));	imageOne.push_back(Point2d(650.494934, 129.172379));
+	imageOne.push_back(Point2d(519.567688, 131.898239));	imageOne.push_back(Point2d(531.834473, 267.480103));
+	imageOne.push_back(Point2d(239.835358, 207.141220));	imageOne.push_back(Point2d(834.740051, 174.580566));
+	imageOne.push_back(Point2d(211.190155, 510.402740));	imageOne.push_back(Point2d(437.319458, 218.244186));
+	imageOne.push_back(Point2d(845.259948, 160.413910));	imageOne.push_back(Point2d(559.729248, 170.678528));
+
+	solver1.setImagePoints(imageOne);
+	solver1.run(1);
+	//cout << "Done!" << endl << endl;
+
+	//cout << "Running second solver... ";
+	//
+	//vector<Point2d> imageTwo;
+	//imageTwo.push_back(Point2d(490, 250));	imageTwo.push_back(Point2d(668, 242));
+	//imageTwo.push_back(Point2d(578, 242));	imageTwo.push_back(Point2d(582, 335));
+	//imageTwo.push_back(Point2d(380, 294));	imageTwo.push_back(Point2d(793, 278));
+	//imageTwo.push_back(Point2d(367, 499));	imageTwo.push_back(Point2d(521, 306));
+	//imageTwo.push_back(Point2d(806, 262));	imageTwo.push_back(Point2d(604, 272));
+	//
+	//solver2.setImagePoints(imageTwo);
+	//solver2.foo(0);
+	//cout << "Done!" << endl;
+
+	// This is the image we did manual matching on
+	frame1 = imread("img_00433.png");
+
+	//cout << "Running SURF/SIFT... ";
+	fdetect.siftDetector(frame1, keypoints1);
+	fdetect.siftExtraction(frame1, keypoints1, descriptors1);
+	//cout << "Done!" << endl;
+
+	vector<int> indexingVector;
+
+	for (int i = 0; i < keypoints1.size(); i++)
+	{
+		for (int j = 0; j<imageOne.size(); j++)
+		{
+			if (areSame(i, imageOne[j].x, imageOne[j].y, keypoints1[i].pt.x, keypoints1[i].pt.y))
+			{
+				//cout << i << endl;
+				//pxIdx.push_back(kpts[i]);
+				indexingVector.push_back(i);
+				imageOne.erase(imageOne.begin() + j);
+			}
+		}
+	}
+
+
+	Mat T = solver1.getCameraPose().clone();
+	Mat K = calib.getCameraMatrix();
+	vector<Point2d> imagepoints = solver1.getVoVImagePoints()[0];
+
+	// Create a vector of "workers", each doing a separate backproject calculation.
+	vector<thread> workers;
+
+	for (int counter = 0; counter < imagepoints.size(); counter++)
+	{
+		workers.push_back(
+			thread(&calcBestPoint,
+				&_3dToDescriptorVector,
+				T,
+				K,
+				keypoints1,
+				cloud,
+				descriptors1,
+				counter));
+
+	}
+
+	// Join acts as a "wall", so that all threads finish before the main thread continues.
+	for (int i = 0; i < workers.size(); i++)
+	{
+		//cout << "Joining thread #" << workers[i].get_id() << endl;
+		if (workers[i].joinable())
+			workers[i].join();
+	}
+
+	//cout << "Size of our LUT: " << endl << _3dToDescriptorVector.size() << endl;
+
+	return _3dToDescriptorVector;
+}
+*/
 
 string type2str(int type) {
 	string r;
@@ -422,3 +699,84 @@ string type2str(int type) {
 
 	return r;
 }
+
+
+
+
+void prepareMap(char* mapCoordinateFile, char* mapKeypointsFile, vector<Point2d>& tunnel2D, vector<Point3d>& tunnel3D, Mat& tunnelDescriptor)
+{
+	// load descriptor
+	string line;
+	ifstream mapFile;
+	mapFile.open(mapCoordinateFile);
+
+	double temp = 0, a = 0, b = 0, x = 0, y = 0, z = 0;
+
+	if (mapFile.is_open())
+	{
+		while (getline(mapFile, line) && !mapFile.eof())
+		{
+			istringstream in(line);
+
+			for (int i = 0; i<5; i++)
+			{
+				in >> temp;
+
+				if (i == 0)
+					a = temp;
+				if (i == 1)
+					b = temp;
+				if (i == 2)
+					x = temp;
+				if (i == 3)
+					y = temp;
+				if (i == 4)
+					z = temp;
+			}
+			tunnel2D.push_back(Point2f(a, b));
+			tunnel3D.push_back(Point3f(x, y, z));
+		}
+	}
+	mapFile.close();
+
+	// load keypoints
+	cv::FileStorage lstorage(mapKeypointsFile, cv::FileStorage::READ);
+	lstorage["img"] >> tunnelDescriptor;
+	lstorage.release();
+
+}
+
+
+
+
+
+
+/*
+// Skeleton code for iterating through the image sequence
+while (vc.read(frame2))
+{
+
+// Change brightness
+//frame2 = frame2 + Scalar(10,10,10);
+
+
+//resize(frame2, frame2, Size(frame2.cols / 2, frame2.rows / 2));
+
+//In the first iteration, only frame2 will contain a frame, so skip this
+if (counter == 0)
+{
+counter++;
+frame1 = frame2.clone();
+continue;
+}
+
+counter++;
+
+// frame1 will hold the previous frame, and in the next iteration we will read a new frame into frame2
+//    These two will thus be continuously cycled.
+frame1 = frame2.clone();
+
+if (waitKey(5000) == 'k')
+break;
+}
+*/

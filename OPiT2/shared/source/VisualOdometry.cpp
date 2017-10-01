@@ -67,8 +67,8 @@ void VO::visualodometry()
     char filename2[100];
 
 #ifndef KITTI_DATASET
-    sprintf(filename1, "%s%04d.png", imagePath, STARTFRAME);
-    sprintf(filename2, "%s%04d.png", imagePath, STARTFRAME+1);
+    sprintf(filename1, "%simg_%05d.png", imagePath, STARTFRAME);
+    sprintf(filename2, "%simg_%05d.png", imagePath, STARTFRAME+1);
 #else
     sprintf(filename1, "%s%04d.png", imagePath, STARTFRAME);
     sprintf(filename2, "%s%04d.png", imagePath, STARTFRAME+1);
@@ -138,7 +138,7 @@ void VO::findPoses(cv::Mat lastImage, std::vector<cv::Point2f>& points1, std::ve
     {
         // load the current image
 #ifndef KITTI_DATASET
-        sprintf(nextimage, "%s%04d.png", imagePath, i);
+        sprintf(nextimage, "%simg_%05d.png", imagePath, i);
 #else
         sprintf(nextimage, "%s00%04d.png", imagePath, i);
 #endif

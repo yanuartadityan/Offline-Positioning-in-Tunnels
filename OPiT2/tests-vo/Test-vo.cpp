@@ -18,7 +18,7 @@ using namespace cv;
 int main ()
 {
     #ifndef KITTI_DATASET
-       char pathname[100] = "/Users/januaditya/Desktop/thesis/gopro/frames-lundby/";
+       char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/tunnel-frames/";
     #else
        char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/kitti-odometry/dataset/sequences/00/image_0/";
     #endif

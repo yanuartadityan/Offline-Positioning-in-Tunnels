@@ -59,7 +59,7 @@ int PnPSolver::run(int verbalOutput)
 
 	Calibration calib;
 
-	Mat cameraMatrix = calib.getCameraMatrix();
+	//Mat cameraMatrix = calib.getCameraMatrix();
 
 
 
@@ -97,7 +97,7 @@ int PnPSolver::run(int verbalOutput)
 	solvePnPRansac(
 		Mat(worldPoints),			// Array of world points in the world coordinate space, 3xN/Nx3 1-channel or 1xN/Nx1 3-channel, where N is the number of points.
 		Mat(imagePoints),			// Array of corresponding image points, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel, where N is the number of points.
-		calib.getCameraMatrix(),				// Self-explanatory...
+		calib.getCameraMatrix(),	// Self-explanatory...
 		calib.getDistortionCoeffs(),// DIST COEFFS, Input vector of distortion coefficients. If null, zero distortion coefficients
 		rVec,						// Output rotation vector.   Together with tvec, brings points from the model coordinate system to the camera coordinate system.
 		tVec,						// Output translation vector
@@ -108,7 +108,7 @@ int PnPSolver::run(int verbalOutput)
 		paramConfidence,			// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
-		SOLVEPNP_P3P);				// FLAGS, method for solving a PnP problem.
+		SOLVEPNP_ITERATIVE);				// FLAGS, method for solving a PnP problem.
 
 		//Create the rotation matrix from the vector created above, by using the "Rodrigues"
 		rMat.create(3, 3, DataType<double>::type);
@@ -176,8 +176,12 @@ int PnPSolver::run(int verbalOutput)
 		PnPSolver::cameraPosition.create(3, 1, DataType<double>::type);
 		Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 0);
 
-		//cameraPosition = -1 * rMat.t() * tVec;
-		PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
+		// version as explained in GitHub OpenCV Sample
+		// 		> https://github.com/opencv/opencv/blob/master/samples/cpp/tutorial_code/calib3d/real_time_pose_estimation/src/PnPProblem.cpp
+		//  	> line 220
+		// this cameraposition is also known as center of projection
+		PnPSolver::cameraPosition = -1 * rMat.t() * tVec;
+		//PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
 
 		camPositions.push_back(PnPSolver::cameraPosition.clone());
 

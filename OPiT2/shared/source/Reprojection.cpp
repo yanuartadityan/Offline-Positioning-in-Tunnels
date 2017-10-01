@@ -123,9 +123,9 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree)
 {
     double THRESHOLD 	= 0.0025;
-    double DELTA_Z 		= 0.05;
-    double MIN_DIST 	= 15;
-    double MAX_DIST 	= 60;
+    double DELTA_Z 		= 0.025;
+    double MIN_DIST 	= 10;
+    double MAX_DIST 	= 30; //60
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;

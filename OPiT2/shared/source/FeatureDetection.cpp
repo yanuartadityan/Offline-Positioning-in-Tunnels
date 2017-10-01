@@ -33,7 +33,7 @@ FeatureDetection::FeatureDetection()
 	// surf
 	min_hessian = 200;
 	octave_layer = 3;
-	contrast_threshold = 0.004;			// default 0.04, lower value more features
+	contrast_threshold = 0.02;			// default 0.04, lower value more features
 	edge_threshold = 10;				// default 10, higher value more features
 	sigma = 1.6;
 
@@ -278,7 +278,10 @@ void FeatureDetection::ratioTestRansac (vector<vector<DMatch> > &matches, Frame 
 
     for (int i=0; i<matches.size(); i++)
     {
-        double tresholdDist = 0.25 * sqrt(double(curr.image.size().height*curr.image.size().height + curr.image.size().width*curr.image.size().width));
+        // this is one of the most important method to track detected features:
+        // a keypoint, or 2D landmark, if detected on the next frame, it would likely be located within close euclidean distance (squared)
+        // from the it's previous frame location. the safest assumption is to think that this distance will not exceed 1/8 diagonal of the image size
+        double tresholdDist = 0.125 * sqrt(double(curr.image.size().height*curr.image.size().height + curr.image.size().width*curr.image.size().width));
 
         // get the closest neighbour (index 0 always gives the closest descriptor)
         DMatch first = matches[i][0];

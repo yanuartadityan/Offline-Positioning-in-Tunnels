@@ -353,3 +353,6 @@ ModelManifest.xml
 /OPiT/logs/reprojectionBackup.txt
 /OPiT/logs/PnPSolverBackup.txt
 /OPiT/logs/mainBackup.txt
+
+# intellij .idea
+.idea/

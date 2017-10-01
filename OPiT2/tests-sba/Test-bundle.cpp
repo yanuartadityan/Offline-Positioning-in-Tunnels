@@ -21,15 +21,16 @@
 #include "BundleAdjust.h"
 
 //  all definitions of variables
-#define WINDOWSIZE              5                       // number of tracked frames every timestep
+#define WINDOWSIZE              1                       // number of tracked frames every timestep
 #define NUMTHREADS              8                       // number of threads spawned for backprojections
 #define PNPITERATION            1000                    // number of iteration for pnp solver
-#define PNPPIXELERROR           5                       // toleration of error pin pixel square
+#define PNPPIXELERROR           10                      // toleration of error pin pixel square
 #define PNPCONFIDENCE           0.99                    // confidence level of 99%
 #define LENGTHFRAME             100                     // number of processed frames
 #define MINFRAMEIDX             433                     // default frame index
-#define MAXFRAMEIDX             MINFRAMEIDX-LENGTHFRAME // default frame index + length
-#define MINCORRESPONDENCES      10                       // minimum amount of 3D-to-2D correspondencs of PnP
+#define MAXFRAMEIDX             MINFRAMEIDX+LENGTHFRAME // default frame index + length
+#define MINCORRESPONDENCES      3                       // minimum amount of 3D-to-2D correspondencs of PnP
+#define THRESHOLD_3DTO2D        200
 
 //  all namespaces
 using namespace std;
@@ -37,11 +38,16 @@ using namespace cv;
 using namespace pcl;
 
 // path to the cloud, tunnel initial correspondences and image sequences
-const string cloudPath   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/gnistangtunneln-full-voxelized.pcd";
+const string cloudPath   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT2/cloud/gnistangtunneln-full.pcd";
 const string map2Dto3D   = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.txt";
 const string mapDesc     = "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.yml";
 const string imgPath     = "/Users/januaditya/Thesis/exjobb-data/volvo/tunnel-frames/";
-//const string imgPath     = "/Users/januaditya/Desktop/thesis/gopro/frames/";
+const string imgPath2    = "/Users/januaditya/Thesis/exjobb-data/gopro/frames/";
+
+bool GoPro               = false;
+
+// helper functions declaration
+void drawFeat(cv::Mat img, std::vector<cv::Point2d>& points1, std::vector<cv::Point2d>& points2, int fidx);
 
 //  start the main
 int main (int argc, char* argv[])
@@ -53,7 +59,7 @@ int main (int argc, char* argv[])
     Calibration cal;
     BundleAdjust bundle;
 
-    // declare all variables for global lookup table
+    // declare all variables for the lookuptable. it contains vector of pairs between 3D points and their SIFT descriptors
     vector<pair<Point3d, Mat> >     _3dToDescriptorTable;
 
     // declare all variables for local frame information
@@ -116,15 +122,12 @@ int main (int argc, char* argv[])
     Frame current;
     Frame prev;
 
-    
-    
-    
-    // start the positioning sequences
-    while (frameIndex > endFrame)
-    {
-        cout << "processing frame-" << frameCount << "..." << endl;
 
-        
+    // start the positioning sequences
+    while (frameIndex < endFrame)
+    {
+        cout << "\nprocessing frame-" << frameCount << "..." << endl;
+
         // log
         {
             sprintf(poseFileIdx, "./log/%d-poseFile.txt", frameIndex);
@@ -134,42 +137,43 @@ int main (int argc, char* argv[])
             correspondencesRefined.open(poseRefinedFileIdx, std::ios::out);
         }
 
-        
+
         // create local object of frame and automatically cleared every new iteration
         vector<int> matchesIndex3D;
         vector<int> matchesIndex2D;
 
         // load the image into the current frame
-        sprintf(currImgPath, "%simg_%05d.png", imgPath.c_str(), frameIndex);
-        //sprintf(currImgPath, "%s%04d.png", imgPath.c_str(), frameIndex);
+        if (GoPro)
+            sprintf(currImgPath, "%s%04d.png", imgPath2.c_str(), frameIndex);               // this one is for the GOPRO
+        else
+            sprintf(currImgPath, "%simg_%05d.png", imgPath.c_str(), frameIndex);
 
-        
         // init current Frame
         current = Frame();
         current.frameIdx = frameCount;
         current.image    = imread(currImgPath);
 
-        
-        
         // preprocess the image to remove visible outliers, e.g. dashboard
         Mat mask = Mat::zeros(current.image.size(), CV_8U);
-        Mat roi (mask, Rect(0, 0, current.image.cols, current.image.rows*7/8));
+        Mat roi (mask, Rect(current.image.cols*1/20, current.image.rows*1/20, current.image.cols*18/20, current.image.rows*17/20));
         roi = Scalar(255, 255, 255);
 
-        
-        
-        // detect features from current frame with provided region of interest mask
-        fdet.siftDetector(current.image, current.keypoints, mask);
 
-        // extract feature descriptors from current frame
-        fdet.siftExtraction(current.image, current.keypoints, current.descriptors);
+        // windowedFrame is a variable vector that contains n most recent Frames. It is used for tracking the most recent features and
+        // also used for Bundle Adjustment (TODO)
 
-        
-        
         Mat lutDesc;
         // match the current frame descriptor with every frames in the window
         if (windowedFrame.size() != 0)
         {
+            // detect features from current frame with provided region of interest mask
+//            fdet.siftDetector(current.image, current.keypoints, mask);
+            fdet.fastDetector(current.image, current.keypoints, mask);
+
+            // extract feature descriptors from current frame
+            fdet.siftExtraction(current.image, current.keypoints, current.descriptors);
+
+
             for (int i=windowedFrame.size()-1; i>=0; i--)
             {
                 // if not empty, then correspondences has to be checked for every frames in the window
@@ -179,42 +183,102 @@ int main (int argc, char* argv[])
                 fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
 
                 // perform lowe's ratio test, last parameter is for cout verbose (true/false)
-                fdet.ratioTestRansac(current.matches, ref(windowedFrame[i]), ref(current), false);
+                fdet.ratioTestRansac(current.matches, ref(windowedFrame[i]), ref(current), true);
             }
+
+
+            // draw current frame's keypoints and matched landmarks
+            {
+                vector <Point2d> currKpts;
+
+                for (int i=0; i<current.keypoints.size(); i++)
+                    currKpts.push_back(Point2d(current.keypoints[i].pt.x, current.keypoints[i].pt.y));
+
+                drawFeat(current.image, currKpts, current.matchedImagePoints, frameIndex);
+            }
+
         }
-        // if window empty
+        // if window empty --> if it's the first frame
         else
         {
-            // if empty, the correspondences are obtained from the lookuptable
-            lutDesc = com.getdescriptor(_3dToDescriptorTable);
+            // current
+            vector <Point3d> worldPoints;
+            // set the image points
+            vector <Point2d> imagePoints;
 
-            // clean LUT
-            _3dToDescriptorTable.clear();
 
-            // matcher
-            fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
-
-            // perform David Lowe's ratio test. it gives 3D/2D indices to use in the next step
-            fdet.ratioTest(current.matches, ref(matchesIndex3D), ref(matchesIndex2D));
-
-            // retrieve the 3D from the lookup table, 2D from current frame's keypoints
-            if (matchesIndex2D.size() != matchesIndex3D.size())
-                cerr << "wrong size of 2D/3D correspondences" << endl;
-            else
+            //-- <! MOCKUP
+            // this part is a mockup part which assuming we have 4 matches between image features and lookuptable
             {
-                for (int i=0; i<matchesIndex2D.size(); i++)
+                worldPoints.push_back(Point3d(143436.267, 6394357.480, 34.037)); //
+                worldPoints.push_back(Point3d(143427.090, 6394362.320, 37.439)); //
+                worldPoints.push_back(Point3d(143427.055, 6394361.512, 33.561)); //
+                worldPoints.push_back(Point3d(143427.073, 6394362.323, 35.505)); //
+
+                // 2D points for Volvo camera
+                if (!GoPro)
                 {
-                    current.matchedWorldPoints.push_back(Point3d(_3dToDescriptorTable[matchesIndex3D[i]].first.x,
-                                                                 _3dToDescriptorTable[matchesIndex3D[i]].first.y,
-                                                                 _3dToDescriptorTable[matchesIndex3D[i]].first.z));
-                    current.matchedImagePoints.push_back(Point2d(current.keypoints[matchesIndex2D[i]].pt.x,
-                                                                 current.keypoints[matchesIndex2D[i]].pt.y));
+                    imagePoints.push_back(Point2d(887.8, 453.1)); //
+                    imagePoints.push_back(Point2d(211.3, 268.4)); //
+                    imagePoints.push_back(Point2d(211.2, 510.4)); //
+                    imagePoints.push_back(Point2d(206.1, 401.5)); //
+                }
+                else
+                // 2D points for GoPro camera
+                {
+                    imagePoints.push_back(Point2d(1365.970, 722.017));       // orange road sign
+                    imagePoints.push_back(Point2d(485.9260, 489.672));       // left top
+                    imagePoints.push_back(Point2d(486.0570, 805.360));       // left bottom
+                    imagePoints.push_back(Point2d(483.0000, 660.000));       // left middle
                 }
             }
+            //-- >! MOCKUP
+
+            // update the current frame's 2D-3D information
+            current.matchedWorldPoints.insert(end(current.matchedWorldPoints), begin(worldPoints), end(worldPoints));
+            current.matchedImagePoints.insert(end(current.matchedImagePoints), begin(imagePoints), end(imagePoints));
+
+            // detect features from current frame with provided region of interest mask
+//            fdet.siftDetector(current.image, current.keypoints, mask);
+            fdet.fastDetector(current.image, current.keypoints, mask);
+
+            // extract feature descriptors from current frame
+            fdet.siftExtraction(current.image, current.keypoints, current.descriptors);
+//
+//
+//            // if empty, the correspondences are obtained from the lookuptable
+//            lutDesc = com.getdescriptor(_3dToDescriptorTable);
+//
+//            // clean LUT
+//            _3dToDescriptorTable.clear();
+//
+//            // matcher
+//            fdet.bfMatcher(lutDesc, current.descriptors, current.matches);
+//
+//            // perform David Lowe's ratio test. it gives 3D/2D indices to use in the next step
+//            fdet.ratioTest(current.matches, ref(matchesIndex3D), ref(matchesIndex2D));
+//
+//            // retrieve the 3D from the lookup table, 2D from current frame's keypoints
+//            if (matchesIndex2D.size() != matchesIndex3D.size())
+//                cerr << "wrong size of 2D/3D correspondences" << endl;
+//            else
+//            {
+//                for (int i=0; i<matchesIndex2D.size(); i++)
+//                {
+//                    current.matchedWorldPoints.push_back(Point3d(_3dToDescriptorTable[matchesIndex3D[i]].first.x,
+//                                                                 _3dToDescriptorTable[matchesIndex3D[i]].first.y,
+//                                                                 _3dToDescriptorTable[matchesIndex3D[i]].first.z));
+//                    current.matchedImagePoints.push_back(Point2d(current.keypoints[matchesIndex2D[i]].pt.x,
+//                                                                 current.keypoints[matchesIndex2D[i]].pt.y));
+//                }
+//            }
+//
+//            // use SIFT only for getting the match for the first LUT, then we use FAST-SIFT
+//            current.keypoints.clear(); current.descriptors.release();
+//            fdet.fastDetector(current.image, current.keypoints, mask);
+//            fdet.siftExtraction(current.image, current.keypoints, current.descriptors);
         }
 
-        
-        
         // once we got the 3D and 2D correspondences and bigger than min correspondences, compute the camera pose
         if (current.matchedWorldPoints.size() < MINCORRESPONDENCES)
         {
@@ -235,74 +299,15 @@ int main (int argc, char* argv[])
             solver.run(1);
         }
 
-        
-        
-        
         // find the rest image points 3D representation using backprojections
         // prepare the matrices
-        {
-            current.K           = cal.getCameraMatrix();
-            current.distCoef    = cal.getDistortionCoeffs();
-            current.R           = solver.getRotationMatrix();
-            current.R_rodrigues = solver.getRotationVector();
-            current.t           = solver.getTranslationVector();
+        current.updateCameraParameters (cal.getCameraMatrix(),
+                                        cal.getDistortionCoeffs(),
+                                        solver.getRotationMatrix(),
+                                        solver.getRotationVector(),
+                                        solver.getTranslationVector(),
+                                        solver.getCameraPose());
 
-            // get the camera pose matrix (3x4). it consists of camera position and the transposed rotation matrix
-            current.cameraPose  = solver.getCameraPose();
-
-            // get the transposed/inversed rotation matrix (3x3).
-            // we can copy 3x3 upper left from the cameraPose (3x4) or just take the inverse of rotation matrix
-            current.R_invert    = current.R.inv();
-            current.t_invert    = (-(current.R_invert) * current.t);
-
-            // for the bundle adjustment, we need every 3d points to be in camera coordinates
-            current.projectWorldtoCamera();
-
-            // get the camera position (3x1) as t_invert.
-            // the alternative way is to copy 3x1 rightmost column from the cameraPose (3x4)
-            if (frameCount == 0)        // initial frame/camera at index-0
-            {
-                current.t_translation   = current.t_invert;
-            }
-            else                        // rest of the frames
-            {
-                current.t_translation   = current.t_invert - prev.t_invert;
-            }
-
-            // log for matched points
-            {
-                // save the current frame retrieved pair 2D and 3D
-                for (int i=0; i<current.matchedImagePoints.size(); i++)
-                {
-                    correspondences << std::fixed << setprecision(4)
-                    << current.matchedWorldPoints[i].x << ", "
-                    << current.matchedWorldPoints[i].y << ", "
-                    << current.matchedWorldPoints[i].z << ", " << std::flush;
-
-                    correspondences << std::fixed << setprecision(4)
-                    << current.matchedImagePoints[i].x << ", "
-                    << current.matchedImagePoints[i].y << "\n" << std::flush;
-                }
-
-                // save the initial camera position
-                logFile << std::fixed << setprecision(10)
-                        << current.cameraPose.at<double>(0,3) << ", "
-                        << current.cameraPose.at<double>(1,3) << ", "
-                        << current.cameraPose.at<double>(2,3) << "\n" << std::flush;
-
-                // save the initial Rotation and Translation matrices from PnP solver
-                logMatrix << std::fixed << setprecision(10)
-                          << current.R.at<double>(0,0) << ", " << current.R.at<double>(0,1) << ", " << current.R.at<double>(0,2) << ", "
-                          << current.R.at<double>(1,0) << ", " << current.R.at<double>(1,1) << ", " << current.R.at<double>(1,2) << ", "
-                          << current.R.at<double>(2,0) << ", " << current.R.at<double>(2,1) << ", " << current.R.at<double>(2,2) << ", "
-                          << current.t.at<double>(0)   << ", " << current.t.at<double>(1)   << ", " << current.t.at<double>(2)   << "\n" << std::flush;
-            }
-        }
-
-        
-        
-        
-        
         // call the multithreaded backprojection wrapper
         com.threading(NUMTHREADS,
                       current.cameraPose,
@@ -318,10 +323,37 @@ int main (int argc, char* argv[])
 
         cout << "  successfully reprojected " << current.reprojectedWorldPoints.size() << " points" << endl;
 
-        
-        
-        // log for reprojected 3D points
+
+
+        // put the current frame into log
         {
+            // save the current frame retrieved pair 2D and 3D
+            for (int i=0; i<current.matchedImagePoints.size(); i++)
+            {
+                correspondences << std::fixed << setprecision(4)
+                                << current.matchedWorldPoints[i].x << ", "
+                                << current.matchedWorldPoints[i].y << ", "
+                                << current.matchedWorldPoints[i].z << ", " << std::flush;
+
+                correspondences << std::fixed << setprecision(4)
+                                << current.matchedImagePoints[i].x << ", "
+                                << current.matchedImagePoints[i].y << "\n" << std::flush;
+            }
+
+            // save the initial camera position
+            logFile << std::fixed << setprecision(10)
+                    << current.cameraPose.at<double>(0,3) << ", "
+                    << current.cameraPose.at<double>(1,3) << ", "
+                    << current.cameraPose.at<double>(2,3) << "\n" << std::flush;
+
+            // save the initial Rotation and Translation matrices from PnP solver
+            logMatrix << std::fixed << setprecision(10)
+                      << current.R.at<double>(0,0) << ", " << current.R.at<double>(0,1) << ", " << current.R.at<double>(0,2) << ", "
+                      << current.R.at<double>(1,0) << ", " << current.R.at<double>(1,1) << ", " << current.R.at<double>(1,2) << ", "
+                      << current.R.at<double>(2,0) << ", " << current.R.at<double>(2,1) << ", " << current.R.at<double>(2,2) << ", "
+                      << current.t.at<double>(0)   << ", " << current.t.at<double>(1)   << ", " << current.t.at<double>(2)   << "\n" << std::flush;
+
+
             for (int i=0; i<current.reprojectedWorldPoints.size(); i++)
             {
                 correspondencesRefined << std::fixed << setprecision(4)
@@ -335,11 +367,16 @@ int main (int argc, char* argv[])
             }
         }
 
-        
-        
-        
-        // update LUT
+
+        // update lookuptable:
+        // the initial lookuptable has only small size of 3D-to-descriptor correspondences that needs to be updated
+        // with most recent 3D-to-descriptors found using the multithreaded backprojection. it means that the newest
+        // pairs will be inserted after the previous frame and the oldest frame in the window will be erased
+
+        // !=old _3dToDescriptorTable.insert(end(_3dToDescriptorTable), begin(current._3dToDescriptor), end(current._3dToDescriptor));
+        _3dToDescriptorTable.clear();
         _3dToDescriptorTable.insert(end(_3dToDescriptorTable), begin(current._3dToDescriptor), end(current._3dToDescriptor));
+        cout << "  lookuptable has " << _3dToDescriptorTable.size() << " 3D-Descriptor pairs (before clearing)" << endl;
 
         // push frame into the window
         windowedFrame.push_back(current);
@@ -348,28 +385,28 @@ int main (int argc, char* argv[])
         // after the execution, all frames's motion and worldPoints within sliding window will be optimized
         //bundle.run(ref(windowedFrame));
 
-        
-        
+
+
         if (windowedFrame.size() > WINDOWSIZE)
         {
             // clear the first index elements from lookup table
-            _3dToDescriptorTable.erase(_3dToDescriptorTable.begin(), _3dToDescriptorTable.begin() + windowedFrame[0].reprojectedWorldPoints.size());
+            // != old _3dToDescriptorTable.erase(_3dToDescriptorTable.begin(), _3dToDescriptorTable.begin() + windowedFrame[0].reprojectedWorldPoints.size());
 
             // clear the first frame inside window if the window is full
             windowedFrame.erase(windowedFrame.begin());
         }
+        cout << "  lookuptable has " << _3dToDescriptorTable.size() << " 3D-Descriptor pairs (after clearing)" << endl;
 
-        
-        
+
         // now current becomes previous frame
         // TODO: still don't know how to use previous frame, verification maybe?
         prev = Frame();
         prev = current;
 
-        
-        
+
+
         // end of sequences, go to the next frameIndex
-        frameIndex=frameIndex-2;
+        frameIndex++;
         frameCount++;
 
         // log
@@ -377,17 +414,53 @@ int main (int argc, char* argv[])
            correspondences.close();
            correspondencesRefined.close();
         }
-    }
 
-    
-    
-    
+
+        // wait for the user keyboard interrupt
+        waitKey(1);
+
+
+
+    }   // end the main loop
+
+
     // log
     {
         logFile.close();
         logMatrix.close();
     }
 
+
     // end of the main caller
     return 0;
+}
+
+
+
+
+// helper function definitions
+void drawFeat(Mat img, vector<Point2d>& points1, vector<Point2d>& points2, int fidx)
+{
+    char imgName[100];
+
+    Mat windowOutput;
+    img.copyTo(windowOutput);
+
+    namedWindow("Output Features", WINDOW_NORMAL);
+
+    for (int i=0; i<points1.size(); i++)
+    {
+        //cv::line(windowOutput, points1[i], points2[i], CV_RGB(243, 225, 63));
+        //cv::line(windowOutput, points1[i], points2[i], CV_RGB(82, 192, 249));
+        cv::circle(windowOutput, points1[i], 1, CV_RGB(82, 192, 249));
+    }
+
+    for (int i=0; i<points2.size(); i++)
+    {
+        cv::circle(windowOutput, points2[i], 4, CV_RGB(243, 225, 63));
+    }
+
+    imshow("Output Features", windowOutput);
+    sprintf(imgName, "%04d.png", fidx);
+    imwrite(imgName, windowOutput);
 }
